@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; }
+  body {
+    width: 640px;
+    height: 480px;
+    background: #F0F2FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  }
+  .container {
+    display: flex;
+    align-items: center;
+    gap: 60px;
+  }
+  .app-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .app-icon img {
+    width: 120px;
+    height: 120px;
+    border-radius: 22px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .app-icon span {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+  }
+  .arrow {
+    display: flex;
+    align-items: center;
+  }
+  .arrow svg {
+    width: 60px;
+    height: 40px;
+  }
+  .folder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .folder-icon {
+    width: 120px;
+    height: 100px;
+    position: relative;
+  }
+  .folder span {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="app-icon">
+      <img src="../Downloads/iconimg.png" alt="01haka">
+      <span>01haka</span>
+    </div>
+    <div class="arrow">
+      <svg viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 20H50" stroke="#666" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M42 10L52 20L42 30" stroke="#666" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="folder">
+      <svg class="folder-icon" viewBox="0 0 120 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 25C10 20 14 16 19 16H45L55 25H101C106 25 110 29 110 34V80C110 85 106 89 101 89H19C14 89 10 85 10 80V25Z" fill="#5AB0F7"/>
+        <path d="M10 35C10 30 14 28 19 28H101C106 28 110 30 110 35V80C110 85 106 89 101 89H19C14 89 10 85 10 80V35Z" fill="#4DA3F0"/>
+        <path d="M15 40H105V82C105 84 103 86 101 86H19C17 86 15 84 15 82V40Z" fill="#3D8CE0" opacity="0.3"/>
+      </svg>
+      <span>Applications</span>
+    </div>
+  </div>
+</body>
+</html>
