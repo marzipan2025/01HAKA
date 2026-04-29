@@ -183,6 +183,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .hanjaToggleGlassEffect)) { _ in
             viewModel.useGlassEffect.toggle()
+            UserDefaults.standard.set(viewModel.useGlassEffect, forKey: "useGlassEffect")
         }
         .onAppear {
             isInputFocused = true
@@ -644,7 +645,7 @@ class HanjaViewModel: ObservableObject {
     @Published var isEditing: Bool = true
     @Published var hasSearched: Bool = false
     @Published var isAlwaysOnTop: Bool = false
-    @Published var useGlassEffect: Bool = true
+    @Published var useGlassEffect: Bool = UserDefaults.standard.object(forKey: "useGlassEffect") as? Bool ?? true
     @Published var failureMessage: String = ""
     @Published var isEraseMessage: Bool = false
 
