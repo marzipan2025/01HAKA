@@ -79,13 +79,19 @@ struct ScrollViewFinder: NSViewRepresentable {
 
 // MARK: - Legacy background (pre-macOS 26 fallback)
 
+final class PassthroughVisualEffectView: NSVisualEffectView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+}
+
 struct VisualEffectBackground: NSViewRepresentable {
     let material: NSVisualEffectView.Material
     let blendingMode: NSVisualEffectView.BlendingMode
     var alpha: CGFloat = 1.0
 
     func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
+        let view = PassthroughVisualEffectView()
         view.material = material
         view.blendingMode = blendingMode
         view.state = .active
@@ -184,6 +190,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .hanjaToggleGlassEffect)) { _ in
             viewModel.useGlassEffect.toggle()
             UserDefaults.standard.set(viewModel.useGlassEffect, forKey: "useGlassEffect")
+            UserDefaults.standard.synchronize()
         }
         .onAppear {
             isInputFocused = true
