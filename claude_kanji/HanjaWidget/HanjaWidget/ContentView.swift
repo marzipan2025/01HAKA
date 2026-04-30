@@ -142,6 +142,7 @@ struct GlassBackgroundModifier: ViewModifier {
 
 struct ContentView: View {
     @StateObject private var viewModel = HanjaViewModel()
+    @AppStorage("useGlassEffect") private var useGlassEffect: Bool = true
     @FocusState private var isInputFocused: Bool
     var body: some View {
         VStack(spacing: 0) {
@@ -161,7 +162,7 @@ struct ContentView: View {
         }
         .padding(0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .modifier(GlassBackgroundModifier(useGlass: viewModel.useGlassEffect))
+        .modifier(GlassBackgroundModifier(useGlass: useGlassEffect))
         .ignoresSafeArea()
         .overlay(alignment: .topTrailing) {
                 Button(action: {
@@ -188,9 +189,8 @@ struct ContentView: View {
             setWindowLevel(viewModel.isAlwaysOnTop ? .floating : .normal)
         }
         .onReceive(NotificationCenter.default.publisher(for: .hanjaToggleGlassEffect)) { _ in
-            viewModel.useGlassEffect.toggle()
-            UserDefaults.standard.set(viewModel.useGlassEffect, forKey: "useGlassEffect")
-            UserDefaults.standard.synchronize()
+            useGlassEffect.toggle()
+            refocusInputIfNeeded()
         }
         .onAppear {
             isInputFocused = true
@@ -205,6 +205,17 @@ struct ContentView: View {
 
     private func setWindowLevel(_ level: NSWindow.Level) {
         NSApplication.shared.windows.first?.level = level
+    }
+
+    private func refocusInputIfNeeded() {
+        guard viewModel.isEditing else { return }
+        DispatchQueue.main.async {
+            NSApplication.shared.windows.first?.makeKey()
+            isInputFocused = false
+            DispatchQueue.main.async {
+                isInputFocused = true
+            }
+        }
     }
 
     // MARK: - 한자 표시 영역 (고정 높이)
@@ -652,7 +663,6 @@ class HanjaViewModel: ObservableObject {
     @Published var isEditing: Bool = true
     @Published var hasSearched: Bool = false
     @Published var isAlwaysOnTop: Bool = false
-    @Published var useGlassEffect: Bool = UserDefaults.standard.object(forKey: "useGlassEffect") as? Bool ?? true
     @Published var failureMessage: String = ""
     @Published var isEraseMessage: Bool = false
 
