@@ -193,12 +193,10 @@ struct ContentView: View {
             refocusInputIfNeeded()
         }
         .onAppear {
-            isInputFocused = true
+            refocusInputIfNeeded()
             viewModel.setupKeyMonitor { [weak viewModel] in
                 viewModel?.resetToEditing()
-                DispatchQueue.main.async {
-                    self.isInputFocused = true
-                }
+                self.refocusInputIfNeeded()
             }
         }
     }
@@ -209,11 +207,18 @@ struct ContentView: View {
 
     private func refocusInputIfNeeded() {
         guard viewModel.isEditing else { return }
-        DispatchQueue.main.async {
-            NSApplication.shared.windows.first?.makeKey()
-            isInputFocused = false
-            DispatchQueue.main.async {
-                isInputFocused = true
+
+        for delay in [0.0, 0.05, 0.15] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard viewModel.isEditing else { return }
+                if let window = NSApplication.shared.windows.first(where: { $0.isVisible }) {
+                    window.makeKeyAndOrderFront(nil)
+                }
+                isInputFocused = false
+                DispatchQueue.main.async {
+                    guard viewModel.isEditing else { return }
+                    isInputFocused = true
+                }
             }
         }
     }
