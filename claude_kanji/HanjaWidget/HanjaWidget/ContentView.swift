@@ -107,6 +107,8 @@ struct VisualEffectBackground: NSViewRepresentable {
 }
 
 struct GlassBackgroundModifier: ViewModifier {
+    private let cornerRadius: CGFloat = 26
+
     var useGlass: Bool
 
     @ViewBuilder
@@ -117,13 +119,8 @@ struct GlassBackgroundModifier: ViewModifier {
                     VisualEffectBackground(material: .fullScreenUI, blendingMode: .behindWindow, alpha: 1.0)
                     Color(red: 0xE0/255, green: 0xE0/255, blue: 0xF0/255).opacity(0.48)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 26))
             )
-            .clipShape(RoundedRectangle(cornerRadius: 26))
-            .overlay(
-                RoundedRectangle(cornerRadius: 26)
-                    .stroke(Color(red: 0xC7/255, green: 0xCB/255, blue: 0xD9/255).opacity(0.10), lineWidth: 1)
-            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
     func body(content: Content) -> some View {
@@ -131,9 +128,9 @@ struct GlassBackgroundModifier: ViewModifier {
             content
                 .background(
                     Color(red: 0x7B/255, green: 0x86/255, blue: 0x98/255).opacity(0.40)
-                        .clipShape(RoundedRectangle(cornerRadius: 26))
                 )
-                .glassEffect(.clear, in: .rect(cornerRadius: 26))
+                .glassEffect(.clear, in: .rect(cornerRadius: 0))
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         } else {
             legacyBackground(content)
         }
@@ -146,10 +143,14 @@ struct ContentView: View {
     @FocusState private var isInputFocused: Bool
     var body: some View {
         VStack(spacing: 0) {
+            windowChromeArea
+                .frame(maxWidth: .infinity)
+                .frame(height: 26)
+
             // 상단: 한자 표시 (고정 높이)
             hanjaDisplayArea
                 .frame(maxWidth: .infinity)
-                .frame(height: 90)
+                .frame(height: 84)
 
             // 중단: 훈/음 표시 (가변 높이)
             hunEumArea
@@ -162,24 +163,9 @@ struct ContentView: View {
         }
         .padding(0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: 310, minHeight: 270)
         .modifier(GlassBackgroundModifier(useGlass: useGlassEffect))
         .ignoresSafeArea()
-        .overlay(alignment: .topTrailing) {
-                Button(action: {
-                    viewModel.isAlwaysOnTop.toggle()
-                    setWindowLevel(viewModel.isAlwaysOnTop ? .floating : .normal)
-                }) {
-                    Image("onTop")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 26, height: 26)
-                        .opacity(viewModel.isAlwaysOnTop ? 1.0 : 0.5)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 8)
-                .padding(.trailing, 8)
-        }
-        .frame(minWidth: 270, minHeight: 240)
         .onReceive(NotificationCenter.default.publisher(for: .hanjaEraseRecords)) { _ in
             UserDefaults.standard.removeObject(forKey: "hanjaSearchHistory")
             SearchHistoryStore.deleteHistoryFile()
@@ -204,6 +190,68 @@ struct ContentView: View {
 
     private func setWindowLevel(_ level: NSWindow.Level) {
         NSApplication.shared.windows.first?.level = level
+    }
+
+    private var windowChromeArea: some View {
+        HStack(alignment: .top) {
+            trafficLightButtons
+                .padding(.top, 29)
+                .padding(.leading, 18)
+
+            Spacer(minLength: 0)
+
+            alwaysOnTopButton
+                .padding(.top, 14)
+                .padding(.trailing, 3)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .contentShape(Rectangle())
+    }
+
+    private var trafficLightButtons: some View {
+        HStack(spacing: 8) {
+            trafficLightButton(color: Color(red: 1.0, green: 0.38, blue: 0.34)) {
+                windowForActions()?.close()
+            }
+            trafficLightButton(color: Color(red: 1.0, green: 0.74, blue: 0.18)) {
+                windowForActions()?.miniaturize(nil)
+            }
+            trafficLightButton(color: Color(red: 0.16, green: 0.78, blue: 0.27)) {
+                windowForActions()?.zoom(nil)
+            }
+        }
+    }
+
+    private func trafficLightButton(color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Circle()
+                .fill(color)
+                .overlay(Circle().stroke(Color.black.opacity(0.20), lineWidth: 0.6))
+                .frame(width: 14, height: 14)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+    }
+
+    private var alwaysOnTopButton: some View {
+        Button(action: {
+            viewModel.isAlwaysOnTop.toggle()
+            setWindowLevel(viewModel.isAlwaysOnTop ? .floating : .normal)
+        }) {
+            Image("onTop")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 26, height: 26)
+                .frame(width: 40, height: 40)
+                .contentShape(Rectangle())
+                .opacity(viewModel.isAlwaysOnTop ? 1.0 : 0.5)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+    }
+
+    private func windowForActions() -> NSWindow? {
+        NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first(where: { $0.isVisible })
     }
 
     private func refocusInputIfNeeded() {
@@ -240,7 +288,7 @@ struct ContentView: View {
                     .font(.system(size: 56, weight: .ultraLight))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 16)
-                    .padding(.top, 12)
+                    .padding(.top, 10)
             } else {
                 Text("漢字")
                     .font(.system(size: 56, weight: .ultraLight))

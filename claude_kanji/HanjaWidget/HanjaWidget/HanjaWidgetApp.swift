@@ -10,7 +10,7 @@ struct HanjaWidgetApp: App {
                 .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 270, height: 240)
+        .defaultSize(width: 310, height: 270)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(after: .newItem) {
@@ -74,17 +74,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func applyStyle(_ window: NSWindow) {
         window.styleMask = [.borderless, .resizable, .fullSizeContentView]
-        window.minSize = NSSize(width: 270, height: 240)
+        window.minSize = NSSize(width: 310, height: 270)
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = true
         window.isMovableByWindowBackground = true
+        clearFrameMask(for: window)
 
         if let contentView = window.contentView {
             contentView.wantsLayer = true
-            contentView.layer?.cornerRadius = 26
-            contentView.layer?.masksToBounds = true
+            contentView.layer?.cornerRadius = 0
+            contentView.layer?.masksToBounds = false
             contentView.layer?.backgroundColor = .clear
         }
+    }
+
+    private func clearFrameMask(for window: NSWindow) {
+        guard let frameView = window.contentView?.superview else { return }
+        frameView.wantsLayer = true
+        frameView.layer?.cornerRadius = 0
+        frameView.layer?.masksToBounds = false
+        frameView.layer?.backgroundColor = NSColor.clear.cgColor
     }
 }
