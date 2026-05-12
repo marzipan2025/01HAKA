@@ -13,7 +13,21 @@ struct HanjaWidgetApp: App {
         .defaultSize(width: 270, height: 240)
         .windowResizability(.contentMinSize)
         .commands {
-            CommandGroup(after: .appInfo) {
+            CommandGroup(after: .newItem) {
+                Button("Open History") {
+                    SearchHistoryStore.openHistoryFolder()
+                }
+                .keyboardShortcut("o", modifiers: .command)
+            }
+
+            CommandGroup(after: .textEditing) {
+                Button("Erase Records") {
+                    NotificationCenter.default.post(name: .hanjaEraseRecords, object: nil)
+                }
+                .keyboardShortcut("e", modifiers: .command)
+            }
+
+            CommandGroup(after: .toolbar) {
                 Button("Always on Top") {
                     NotificationCenter.default.post(name: .hanjaToggleAlwaysOnTop, object: nil)
                 }
@@ -23,11 +37,6 @@ struct HanjaWidgetApp: App {
                     NotificationCenter.default.post(name: .hanjaToggleGlassEffect, object: nil)
                 }
                 .keyboardShortcut("g", modifiers: .command)
-
-                Button("Erase Records") {
-                    NotificationCenter.default.post(name: .hanjaEraseRecords, object: nil)
-                }
-                .keyboardShortcut("e", modifiers: .command)
             }
         }
     }
