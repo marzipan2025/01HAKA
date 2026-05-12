@@ -15,18 +15,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build Release app
+      - name: Restore Release app
         run: |
-          xcodebuild \
-            -project claude_kanji/HanjaWidget/HanjaWidget.xcodeproj \
-            -scheme HanjaWidget \
-            -configuration Release \
-            -derivedDataPath "$RUNNER_TEMP/01haka-derived" \
-            clean build
+          ditto -x -k .github/tmp/01haka-release-app.zip "$RUNNER_TEMP/01haka-app"
+          test -d "$RUNNER_TEMP/01haka-app/01haka.app"
 
       - name: Create DMG
         run: |
-          APP_PATH="$RUNNER_TEMP/01haka-derived/Build/Products/Release/01haka.app"
+          APP_PATH="$RUNNER_TEMP/01haka-app/01haka.app"
           STAGING="$RUNNER_TEMP/01haka-dmg"
           OUT="$PWD/claude_kanji/01haka.dmg"
 
