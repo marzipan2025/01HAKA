@@ -1,0 +1,54 @@
+name: Build release DMG
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-dmg:
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build Release app
+        run: |
+          xcodebuild \
+            -project claude_kanji/HanjaWidget/HanjaWidget.xcodeproj \
+            -scheme HanjaWidget \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/01haka-derived" \
+            clean build
+
+      - name: Create DMG
+        run: |
+          APP_PATH="$RUNNER_TEMP/01haka-derived/Build/Products/Release/01haka.app"
+          STAGING="$RUNNER_TEMP/01haka-dmg"
+          OUT="$PWD/claude_kanji/01haka.dmg"
+
+          mkdir -p "$STAGING"
+          ditto "$APP_PATH" "$STAGING/01haka.app"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname "01haka" -srcfolder "$STAGING" -format UDZO -ov -o "$OUT"
+          ls -lh "$OUT"
+
+      - name: Commit DMG
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add claude_kanji/01haka.dmg
+          if git diff --cached --quiet; then
+            echo "No DMG changes to commit."
+          else
+            git commit -m "build v1.1.1 dmg"
+            git push
+          fi
+
+      - name: Upload DMG to existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload v1.1.1 claude_kanji/01haka.dmg --clobber

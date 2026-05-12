@@ -141,6 +141,8 @@ struct ContentView: View {
     @StateObject private var viewModel = HanjaViewModel()
     @AppStorage("useGlassEffect") private var useGlassEffect: Bool = true
     @FocusState private var isInputFocused: Bool
+    @State private var isTrafficLightHovered = false
+
     var body: some View {
         VStack(spacing: 0) {
             windowChromeArea
@@ -195,8 +197,8 @@ struct ContentView: View {
     private var windowChromeArea: some View {
         HStack(alignment: .top) {
             trafficLightButtons
-                .padding(.top, 29)
-                .padding(.leading, 18)
+                .padding(.top, 27)
+                .padding(.leading, 16)
 
             Spacer(minLength: 0)
 
@@ -210,24 +212,51 @@ struct ContentView: View {
 
     private var trafficLightButtons: some View {
         HStack(spacing: 8) {
-            trafficLightButton(color: Color(red: 1.0, green: 0.38, blue: 0.34)) {
+            trafficLightButton(
+                color: Color(red: 1.0, green: 0.38, blue: 0.34),
+                icon: AnyView(
+                    Image(systemName: "xmark")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Color(red: 0.47, green: 0.02, blue: 0.00))
+                )
+            ) {
                 windowForActions()?.close()
             }
-            trafficLightButton(color: Color(red: 1.0, green: 0.74, blue: 0.18)) {
+            trafficLightButton(
+                color: Color(red: 1.0, green: 0.74, blue: 0.18),
+                icon: AnyView(
+                    RoundedRectangle(cornerRadius: 0.8, style: .continuous)
+                        .fill(Color(red: 0.58, green: 0.32, blue: 0.00))
+                        .frame(width: 7, height: 1.4)
+                )
+            ) {
                 windowForActions()?.miniaturize(nil)
             }
-            trafficLightButton(color: Color(red: 0.16, green: 0.78, blue: 0.27)) {
+            trafficLightButton(
+                color: Color(red: 0.16, green: 0.78, blue: 0.27),
+                icon: AnyView(
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Color(red: 0.02, green: 0.36, blue: 0.07))
+                )
+            ) {
                 windowForActions()?.zoom(nil)
             }
         }
+        .onHover { isTrafficLightHovered = $0 }
     }
 
-    private func trafficLightButton(color: Color, action: @escaping () -> Void) -> some View {
+    private func trafficLightButton(color: Color, icon: AnyView, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Circle()
-                .fill(color)
-                .overlay(Circle().stroke(Color.black.opacity(0.20), lineWidth: 0.6))
-                .frame(width: 14, height: 14)
+            ZStack {
+                Circle()
+                    .fill(color)
+                    .overlay(Circle().stroke(Color.black.opacity(0.20), lineWidth: 0.6))
+
+                icon
+                    .opacity(isTrafficLightHovered ? 1 : 0)
+            }
+            .frame(width: 14, height: 14)
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
@@ -287,14 +316,14 @@ struct ContentView: View {
                     .foregroundColor(viewModel.isEraseMessage ? .black.opacity(0.3) : .white.opacity(0.3))
                     .font(.system(size: 56, weight: .ultraLight))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.leading, 16)
+                    .padding(.leading, 14)
                     .padding(.top, 10)
             } else {
                 Text("漢字")
                     .font(.system(size: 56, weight: .ultraLight))
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(.white.opacity(0.45))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.leading, 16)
+                    .padding(.leading, 14)
                     .padding(.top, 12)
             }
         }
@@ -309,7 +338,7 @@ struct ContentView: View {
             let weights: [Font.Weight] = [.ultraLight, .light, .medium]
             let weight = weights[min(tier, weights.count - 1)]
             let color: Color = {
-                if !isActive { return .white.opacity(0.3) }
+                if !isActive { return .white.opacity(0.45) }
                 if tier >= 5 { return .black }
                 else if tier >= 4 { return Color(red: 1, green: 1, blue: 0) }
                 else if tier >= 3 { return Color(red: 1, green: 0xFC/255, blue: 0xCB/255) }
@@ -382,7 +411,7 @@ struct ContentView: View {
                     )
             }
         }
-        .padding(.leading, 16)
+        .padding(.leading, 14)
         .id(wordIndex)
     }
 
@@ -401,7 +430,7 @@ struct ContentView: View {
                                 .textSelection(.enabled)
                                 .lineLimit(1)
                                 .fixedSize()
-                                .padding(.leading, 16)
+                                .padding(.leading, 14)
                                 .background(wordPositionTracker(wordIndex: index))
                                 .id(index)
                         }

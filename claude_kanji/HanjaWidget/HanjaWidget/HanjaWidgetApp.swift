@@ -73,7 +73,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func applyStyle(_ window: NSWindow) {
-        window.styleMask = [.borderless, .resizable, .fullSizeContentView]
+        window.styleMask = [.borderless, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.minSize = NSSize(width: 310, height: 270)
         window.isOpaque = false
         window.backgroundColor = .clear
