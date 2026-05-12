@@ -182,6 +182,7 @@ struct ContentView: View {
         .frame(minWidth: 270, minHeight: 240)
         .onReceive(NotificationCenter.default.publisher(for: .hanjaEraseRecords)) { _ in
             UserDefaults.standard.removeObject(forKey: "hanjaSearchHistory")
+            SearchHistoryStore.deleteHistoryFile()
             viewModel.showEraseConfirmation()
         }
         .onReceive(NotificationCenter.default.publisher(for: .hanjaToggleAlwaysOnTop)) { _ in
@@ -721,6 +722,7 @@ class HanjaViewModel: ObservableObject {
             }
         }
         saveHistory(history)
+        SearchHistoryStore.append(words: words)
     }
 
     func previousSearchCount(for char: Character) -> Int {
@@ -838,5 +840,114 @@ class HanjaViewModel: ObservableObject {
         hasSearched = true
         isEraseMessage = true
         failureMessage = "Data Erased"
+    }
+}
+
+enum SearchHistoryStore {
+    private static let fileName = "search_history.xls"
+    private static let legacyCSVFileName = "search_history.csv"
+    private static let tableClosingTag = "</table></body></html>"
+
+    private static var historyFolderURL: URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("01haka", isDirectory: true)
+            .appendingPathComponent("SearchHistory", isDirectory: true)
+    }
+
+    private static var historyFileURL: URL? {
+        historyFolderURL?.appendingPathComponent(fileName)
+    }
+
+    private static var legacyCSVFileURL: URL? {
+        historyFolderURL?.appendingPathComponent(legacyCSVFileName)
+    }
+
+    static func append(words: [HanjaWord]) {
+        guard let folderURL = historyFolderURL,
+              let fileURL = historyFileURL else { return }
+
+        do {
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+
+            let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
+            if !fileExists {
+                try initialHTML().write(to: fileURL, atomically: true, encoding: .utf8)
+            }
+
+            let rowsHTML = words.map(historyRowsHTML(for:)).joined()
+            guard !rowsHTML.isEmpty else { return }
+
+            var html = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? initialHTML()
+            if let range = html.range(of: tableClosingTag, options: .backwards) {
+                html.replaceSubrange(range, with: rowsHTML + tableClosingTag)
+            } else {
+                html += rowsHTML + tableClosingTag
+            }
+
+            try html.write(to: fileURL, atomically: true, encoding: .utf8)
+        } catch {
+            print("Failed to append search history: \(error)")
+        }
+    }
+
+    static func openHistoryFolder() {
+        guard let folderURL = historyFolderURL else { return }
+
+        do {
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(folderURL)
+        } catch {
+            print("Failed to open search history folder: \(error)")
+        }
+    }
+
+    static func deleteHistoryFile() {
+        for url in [historyFileURL, legacyCSVFileURL].compactMap({ $0 }) where FileManager.default.fileExists(atPath: url.path) {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    private static func historyRowsHTML(for word: HanjaWord) -> String {
+        var characterInfo: [Character: HanjaChar] = [:]
+        for char in word.characters {
+            characterInfo[char.character] = char
+        }
+
+        let rowCount = max(word.hanjaVariants.count, 1)
+        return word.hanjaVariants.enumerated().map { index, variant in
+            let hunEum = variant.compactMap { char -> String? in
+                guard let info = characterInfo[char] else { return nil }
+                return "\(info.hun) \(info.eum)(\(gradeText(for: char)))"
+            }
+            .joined(separator: ", ")
+
+            let koreanCell = index == 0 ? "<td rowspan=\"\(rowCount)\">\(htmlEscape(word.korean))</td>" : ""
+            return "<tr>\(koreanCell)<td>\(htmlEscape(variant))</td><td>\(htmlEscape(hunEum))</td></tr>\n"
+        }
+        .joined()
+    }
+
+    private static func gradeText(for char: Character) -> String {
+        guard let grade = hanjaGradeMap[char] else { return "미상" }
+        return grade == 0 ? "특" : "\(grade)"
+    }
+
+    private static func initialHTML() -> String {
+        """
+        <html><head><meta charset="UTF-8"><style>
+        table { border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; }
+        th, td { border: 1px solid #d9d9d9; padding: 8px 10px; vertical-align: middle; }
+        th { font-weight: 600; text-align: left; }
+        </style></head><body><table><tr><th>한글</th><th>한자</th><th>훈,음</th></tr>
+        \(tableClosingTag)
+        """
+    }
+
+    private static func htmlEscape(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
     }
 }
