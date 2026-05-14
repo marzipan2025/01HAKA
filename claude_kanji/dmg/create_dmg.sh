@@ -9,11 +9,11 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BG_IMG="$SCRIPT_DIR/dmg_background.png"
 
 # Find the built app
-APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "01haka.app" -path "*/Build/Products/Release/*" 2>/dev/null | head -1)
+APP_PATH=$(find "$PROJECT_DIR/build/DerivedData" ~/Library/Developer/Xcode/DerivedData -name "01haka.app" -path "*/Build/Products/Release/*" 2>/dev/null | head -1)
 
 if [ -z "$APP_PATH" ]; then
     # Try Debug build
-    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "01haka.app" -path "*/Build/Products/Debug/*" 2>/dev/null | head -1)
+    APP_PATH=$(find "$PROJECT_DIR/build/DerivedData" ~/Library/Developer/Xcode/DerivedData -name "01haka.app" -path "*/Build/Products/Debug/*" 2>/dev/null | head -1)
 fi
 
 if [ -z "$APP_PATH" ]; then
