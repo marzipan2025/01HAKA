@@ -215,9 +215,9 @@ struct ContentView: View {
             trafficLightButton(
                 color: Color(red: 1.0, green: 0.38, blue: 0.34),
                 icon: AnyView(
-                    Image(systemName: "xmark")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(Color(red: 0.47, green: 0.02, blue: 0.00))
+                    Image("x_btn")
+                        .resizable()
+                        .frame(width: 14, height: 14)
                 )
             ) {
                 windowForActions()?.close()
@@ -225,9 +225,9 @@ struct ContentView: View {
             trafficLightButton(
                 color: Color(red: 1.0, green: 0.74, blue: 0.18),
                 icon: AnyView(
-                    RoundedRectangle(cornerRadius: 0.8, style: .continuous)
-                        .fill(Color(red: 0.58, green: 0.32, blue: 0.00))
-                        .frame(width: 7, height: 1.4)
+                    Image("minus_btn")
+                        .resizable()
+                        .frame(width: 14, height: 14)
                 )
             ) {
                 windowForActions()?.miniaturize(nil)
@@ -235,9 +235,9 @@ struct ContentView: View {
             trafficLightButton(
                 color: Color(red: 0.16, green: 0.78, blue: 0.27),
                 icon: AnyView(
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(Color(red: 0.02, green: 0.36, blue: 0.07))
+                    Image("max_btn")
+                        .resizable()
+                        .frame(width: 14, height: 14)
                 )
             ) {
                 windowForActions()?.zoom(nil)
