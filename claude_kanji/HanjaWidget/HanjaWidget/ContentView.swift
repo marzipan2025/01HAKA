@@ -115,6 +115,8 @@ struct GlassBackgroundModifier: ViewModifier {
     private let cornerRadius: CGFloat = 26
 
     var useGlass: Bool
+    /// 창이 활성 상태인지. 비활성이면 리퀴드 대신 불투명(legacy) 배경으로 내림
+    var isWindowActive: Bool = true
 
     @ViewBuilder
     private func legacyBackground(_ content: Content) -> some View {
@@ -122,14 +124,14 @@ struct GlassBackgroundModifier: ViewModifier {
             .background(
                 ZStack {
                     VisualEffectBackground(material: .fullScreenUI, blendingMode: .behindWindow, alpha: 1.0)
-                    Color(red: 0xE0/255, green: 0xE0/255, blue: 0xF0/255).opacity(0.48)
+                    Color(red: 0xF5/255, green: 0xF4/255, blue: 0xFF/255).opacity(0.85)
                 }
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *), useGlass {
+        if #available(macOS 26.0, *), useGlass, isWindowActive {
             content
                 .background(
                     // 색면 없이 유리 밑 블러 레이어만으로 가독성 확보
@@ -148,6 +150,7 @@ struct ContentView: View {
     @AppStorage("useGlassEffect") private var useGlassEffect: Bool = true
     @FocusState private var isInputFocused: Bool
     @State private var isTrafficLightHovered = false
+    @State private var isWindowActive = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -164,6 +167,11 @@ struct ContentView: View {
             hunEumArea
                 .frame(maxWidth: .infinity)
                 .layoutPriority(1)
+                .overlay {
+                    if showUpdatePrompt {
+                        updateButton
+                    }
+                }
 
             // 하단: 입력 영역 (고정 높이)
             inputArea
@@ -172,8 +180,14 @@ struct ContentView: View {
         .padding(0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minWidth: 310, minHeight: 270)
-        .modifier(GlassBackgroundModifier(useGlass: useGlassEffect))
+        .modifier(GlassBackgroundModifier(useGlass: useGlassEffect, isWindowActive: isWindowActive))
         .ignoresSafeArea()
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            isWindowActive = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            isWindowActive = false
+        }
         .onReceive(NotificationCenter.default.publisher(for: .hanjaEraseRecords)) { _ in
             UserDefaults.standard.removeObject(forKey: "hanjaSearchHistory")
             SearchHistoryStore.deleteHistoryFile()
@@ -193,7 +207,17 @@ struct ContentView: View {
                 viewModel?.resetToEditing()
                 self.refocusInputIfNeeded()
             }
+            viewModel.checkForUpdate()
         }
+    }
+
+    /// 업데이트 안내를 보여줄 조건: 새 버전 있음 + 아직 검색 전(초기 화면)
+    private var showUpdatePrompt: Bool {
+        viewModel.updateAvailable
+            && !viewModel.updateDismissed
+            && viewModel.isEditing
+            && !viewModel.hasSearched
+            && viewModel.searchResult == nil
     }
 
     private func setWindowLevel(_ level: NSWindow.Level) {
@@ -307,6 +331,28 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - 업데이트 버튼 (가운데 패널)
+
+    private var updateButton: some View {
+        Button(action: { viewModel.startUpdate() }) {
+            Text(viewModel.isUpdating ? "Updating…" : "Update to v \(viewModel.latestVersion)")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.hanjaText)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.14))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isUpdating)
+    }
+
     // MARK: - 한자 표시 영역 (고정 높이)
 
     private var hanjaDisplayArea: some View {
@@ -324,6 +370,17 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
                     .padding(.top, 10)
+            } else if showUpdatePrompt {
+                Text(viewModel.isUpdating
+                     ? (viewModel.updateStatusText.isEmpty ? "Updating…" : viewModel.updateStatusText)
+                     : "Update\nAvailable")
+                    .font(.system(size: 29, weight: .ultraLight))
+                    .foregroundColor(.hanjaText)
+                    .lineSpacing(0)
+                    .fixedSize()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, 15)
+                    .padding(.top, 12)
             } else {
                 Text("漢字")
                     .font(.system(size: 56, weight: .ultraLight))
@@ -584,7 +641,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, minHeight: 30, maxHeight: .infinity)
             .modifier(OverlayScrollerModifier())
             .contentMargins(.top, 12, for: .scrollContent)
-            .background(Color(red: 0xE4/255, green: 0xE8/255, blue: 0xFE/255).opacity(0.14))
+            .background(Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14))
             // 수평 스크롤로 변형이 x=20~40 진입 시 훈/음 스크롤
             .onChange(of: viewModel.activeVariantIndex) { _, newVIdx in
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -755,6 +812,16 @@ class HanjaViewModel: ObservableObject {
     @Published var failureMessage: String = ""
     @Published var isEraseMessage: Bool = false
 
+    // MARK: 업데이트 상태
+    @Published var updateAvailable: Bool = false
+    @Published var latestVersion: String = ""
+    @Published var isUpdating: Bool = false
+    @Published var updateStatusText: String = ""
+    /// 검색을 한 번이라도 하면 이번 세션 동안 업데이트 안내를 숨김
+    @Published var updateDismissed: Bool = false
+    private var updateDMGURL: URL?
+    private var didCheckUpdate = false
+
     private var keyMonitor: Any?
     private var resetAction: (() -> Void)?
     private var audioPlayer: AVAudioPlayer?
@@ -863,10 +930,46 @@ class HanjaViewModel: ObservableObject {
         }
     }
 
+    // MARK: - 자동 업데이트
+
+    /// 앱 실행 시 1회: GitHub 최신 릴리스를 확인해 새 버전이 있으면 안내 노출
+    func checkForUpdate() {
+        guard !didCheckUpdate else { return }
+        didCheckUpdate = true
+        Task {
+            if case .available(let latest, _, let dmgURL) = await UpdateCheck.fetchStatus() {
+                self.latestVersion = latest
+                self.updateDMGURL = dmgURL
+                self.updateAvailable = true
+            }
+        }
+    }
+
+    /// Update 버튼: dmg 다운로드 → 설치 → 재실행 (dmg 자산이 없으면 릴리스 페이지로)
+    func startUpdate() {
+        guard !isUpdating else { return }
+        guard let url = updateDMGURL else {
+            UpdateCheck.openReleasesPage()
+            return
+        }
+        isUpdating = true
+        UpdateCheck.downloadAndInstall(
+            url,
+            version: latestVersion,
+            onStatus: { [weak self] status in self?.updateStatusText = status },
+            onFailure: { [weak self] in
+                self?.isUpdating = false
+                self?.updateStatusText = ""
+                UpdateCheck.openReleasesPage()
+            }
+        )
+    }
+
     func performSearch() {
         let query = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
 
+        updateDismissed = true
         isEditing = false
         hasSearched = true
 

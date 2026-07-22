@@ -19,6 +19,7 @@
 		A10012 /* hanja_grades.txt in Resources */ = {isa = PBXBuildFile; fileRef = A20013 /* hanja_grades.txt */; };
 		A10010 /* DefinitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20011 /* DefinitionService.swift */; };
 		A10011 /* HanjaGrades.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20012 /* HanjaGrades.swift */; };
+		A10020 /* UpdateCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20020 /* UpdateCheck.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +36,7 @@
 		A20011 /* DefinitionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefinitionService.swift; sourceTree = "<group>"; };
 		A20012 /* HanjaGrades.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HanjaGrades.swift; sourceTree = "<group>"; };
 		A20013 /* hanja_grades.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = hanja_grades.txt; sourceTree = "<group>"; };
+		A20020 /* UpdateCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheck.swift; sourceTree = "<group>"; };
 A30001 /* HanjaWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HanjaWidget.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -73,6 +75,7 @@ A30001 /* HanjaWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapp
 				A20011 /* DefinitionService.swift */,
 				A20012 /* HanjaGrades.swift */,
 				A20013 /* hanja_grades.txt */,
+				A20020 /* UpdateCheck.swift */,
 			);
 			path = HanjaWidget;
 			sourceTree = "<group>";
@@ -166,6 +169,7 @@ A30001 /* HanjaWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapp
 				A10004 /* Models.swift in Sources */,
 				A10010 /* DefinitionService.swift in Sources */,
 				A10011 /* HanjaGrades.swift in Sources */,
+				A10020 /* UpdateCheck.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -307,7 +311,7 @@ A30001 /* HanjaWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapp
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.3;
+				MARKETING_VERSION = 1.1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hanjawidget.app;
 				PRODUCT_NAME = 01haka;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -334,7 +338,7 @@ A30001 /* HanjaWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapp
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.3;
+				MARKETING_VERSION = 1.1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hanjawidget.app;
 				PRODUCT_NAME = 01haka;
 				SWIFT_EMIT_LOC_STRINGS = YES;
