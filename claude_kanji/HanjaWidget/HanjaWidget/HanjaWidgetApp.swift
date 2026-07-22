@@ -48,8 +48,8 @@ extension Notification.Name {
     static let hanjaToggleGlassEffect = Notification.Name("hanjaToggleGlassEffect")
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    private var didSetup = false
+class AppDelegate: NSObject, NSApplicationDelegate {
+    private var keyWindowObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 저장된 윈도우 프레임 초기화
@@ -58,21 +58,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             defaults.removeObject(forKey: key)
         }
 
-        DispatchQueue.main.async {
-            guard let window = NSApplication.shared.windows.first else { return }
-            window.delegate = self
-            self.applyStyle(window)
-            self.didSetup = true
+        // 창 생성 타이밍과 무관하게, 키 윈도우가 될 때마다 스타일을 보장
+        keyWindowObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let window = notification.object as? NSWindow else { return }
+            self?.applyStyle(window)
         }
-    }
 
-    func windowDidBecomeKey(_ notification: Notification) {
-        if let window = notification.object as? NSWindow {
-            applyStyle(window)
-        }
+        NSApplication.shared.windows.forEach(applyStyle)
     }
 
     private func applyStyle(_ window: NSWindow) {
+        // styleMask가 어떤 이유로 되돌아가도 시스템 신호등이 다시 보이지 않도록 명시적으로 숨김
+        window.standardWindowButton(.closeButton)?.isHidden = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+
         window.styleMask = [.borderless, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.minSize = NSSize(width: 310, height: 270)
         window.isOpaque = false
@@ -87,6 +91,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             contentView.layer?.masksToBounds = false
             contentView.layer?.backgroundColor = .clear
         }
+
+        // 투명 창의 잔상(이전 프레임 그림자) 제거
+        window.invalidateShadow()
     }
 
     private func clearFrameMask(for window: NSWindow) {
