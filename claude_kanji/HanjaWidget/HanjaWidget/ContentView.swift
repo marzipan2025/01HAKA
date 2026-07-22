@@ -78,8 +78,10 @@ struct ScrollViewFinder: NSViewRepresentable {
 }
 
 extension Color {
-    /// 본문 텍스트 색 (#8FA1BE @ 0.6)
+    /// 본문 텍스트 색 (#8FA1BE @ 0.6) — 리퀴드 모드 활성일 때
     static let hanjaText = Color(red: 0x8F/255, green: 0xA1/255, blue: 0xBE/255).opacity(0.6)
+    /// 비리퀴드(불투명/포커스아웃) 상태의 본문 텍스트 색 — 위 색보다 30% 어둡게 (#647185 @ 0.8)
+    static let hanjaTextDim = Color(red: 0x64/255, green: 0x71/255, blue: 0x85/255).opacity(0.8)
 }
 
 // MARK: - Legacy background (pre-macOS 26 fallback)
@@ -151,6 +153,19 @@ struct ContentView: View {
     @FocusState private var isInputFocused: Bool
     @State private var isTrafficLightHovered = false
     @State private var isWindowActive = true
+
+    /// 리퀴드 글래스가 실제로 보이는 상태 (배경 모디파이어 조건과 일치)
+    private var isLiquidActive: Bool {
+        if #available(macOS 26.0, *) {
+            return useGlassEffect && isWindowActive
+        }
+        return false
+    }
+
+    /// 본문 텍스트 색 — 비리퀴드(불투명/포커스아웃)일 때 20% 어둡게
+    private var textColor: Color {
+        isLiquidActive ? Color.hanjaText : Color.hanjaTextDim
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -353,7 +368,7 @@ struct ContentView: View {
         Button(action: { viewModel.startUpdate() }) {
             Text(viewModel.isUpdating ? "Updating…" : "Update to v \(viewModel.latestVersion)")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.hanjaText)
+                .foregroundColor(textColor)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
                 .background(
@@ -373,7 +388,7 @@ struct ContentView: View {
     private var updatedVersionBody: some View {
         Text("Version \(viewModel.updatedToVersion) has been installed.")
             .font(.system(size: 14))
-            .foregroundColor(.hanjaText)
+            .foregroundColor(textColor)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.horizontal, 16)
             .padding(.top, 16)
@@ -391,7 +406,7 @@ struct ContentView: View {
                 hanjaTextView(result: result)
             } else if viewModel.hasSearched {
                 Text(viewModel.failureMessage)
-                    .foregroundColor(viewModel.isEraseMessage ? .black.opacity(0.3) : .hanjaText)
+                    .foregroundColor(viewModel.isEraseMessage ? .black.opacity(0.3) : textColor)
                     .font(.system(size: 56, weight: .ultraLight))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
@@ -400,7 +415,7 @@ struct ContentView: View {
                 // 설치 후 재실행: 실패 메시지와 동일 규칙(56pt, 축소 없이 잘림)
                 Text("Updated")
                     .font(.system(size: 56, weight: .ultraLight))
-                    .foregroundColor(.hanjaText)
+                    .foregroundColor(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
                     .padding(.top, 10)
@@ -410,14 +425,14 @@ struct ContentView: View {
                      ? (viewModel.updateStatusText.isEmpty ? "Updating…" : viewModel.updateStatusText)
                      : "New Update")
                     .font(.system(size: 56, weight: .ultraLight))
-                    .foregroundColor(.hanjaText)
+                    .foregroundColor(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
                     .padding(.top, 10)
             } else {
                 Text("漢字")
                     .font(.system(size: 56, weight: .ultraLight))
-                    .foregroundColor(.hanjaText)
+                    .foregroundColor(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
                     .padding(.top, 12)
@@ -434,11 +449,11 @@ struct ContentView: View {
             let weights: [Font.Weight] = [.ultraLight, .light, .medium]
             let weight = weights[min(tier, weights.count - 1)]
             let color: Color = {
-                if !isActive { return .hanjaText }
+                if !isActive { return textColor }
                 if tier >= 5 { return .black }
                 else if tier >= 4 { return Color(red: 1, green: 1, blue: 0) }
                 else if tier >= 3 { return Color(red: 1, green: 0xFC/255, blue: 0xCB/255) }
-                return .hanjaText
+                return textColor
             }()
             text = text + Text(String(char))
                 .font(.system(size: 56, weight: weight))
@@ -455,7 +470,7 @@ struct ContentView: View {
             } else {
                 text = text + Text(" \(vIdx)")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.hanjaText)
+                    .foregroundColor(textColor)
                     .baselineOffset(38)
             }
         }
@@ -472,7 +487,7 @@ struct ContentView: View {
                 text = text + Text(", ")
                     .font(.system(size: 42, weight: .ultraLight))
                     .baselineOffset(-10)
-                    .foregroundColor(isActive ? .hanjaText : .hanjaText)
+                    .foregroundColor(isActive ? textColor : textColor)
             }
             text = text + buildVariantText(variant: variant, vIdx: vIdx, isActive: isActive, hasMultipleVariants: hasMultipleVariants)
         }
@@ -488,7 +503,7 @@ struct ContentView: View {
                     Text(", ")
                         .font(.system(size: 30, weight: .ultraLight))
                         .baselineOffset(-22)
-                        .foregroundColor(.hanjaText)
+                        .foregroundColor(textColor)
                 }
                 buildVariantText(variant: variant, vIdx: vIdx, isActive: true, hasMultipleVariants: true)
                     .textSelection(.enabled)
@@ -579,6 +594,8 @@ struct ContentView: View {
     // MARK: - 훈/음 영역 (가변 높이, 항상 표시)
 
     @State private var expandedDefinitions: Set<String> = []
+    /// 중간(훈/음) 스크롤 위치 추적용 — 뷰포트 상단에 걸린 단어의 인덱스
+    @State private var middleTopWord: Int? = 0
 
     /// 급수 원기호 반환
     private func gradeSymbol(for char: Character) -> String {
@@ -590,102 +607,131 @@ struct ContentView: View {
     /// 급수별 색상 반환
     private func gradeColor(for char: Character) -> Color {
         guard let grade = hanjaGradeMap[char] else {
-            return .hanjaText
+            return textColor
         }
         switch grade {
         case 0: return .black
         case 1: return Color(red: 0.16, green: 0.60, blue: 0.82)
         case 2: return .yellow
         case 3: return Color(red: 0.7, green: 0.85, blue: 0.5)
-        default: return .hanjaText
+        default: return textColor
         }
     }
 
     private var hunEumArea: some View {
-        ScrollViewReader { hunProxy in
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let activeWord = viewModel.activeWord {
-                        let hasMultipleVariants = activeWord.hanjaVariants.count > 1
-                        ForEach(Array(activeWord.hanjaVariants.enumerated()), id: \.offset) { vIdx, variant in
-                            if vIdx > 0 {
-                                Spacer().frame(height: 6)
-                            }
-                            // 변형 섹션 — 스크롤 앵커 ID 부여
-                            VStack(alignment: .leading, spacing: 4) {
-                                ForEach(Array(variant.enumerated()), id: \.offset) { cIdx, char in
-                                    if let charInfo = activeWord.characters.first(where: { $0.character == char }) {
-                                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                            Text(charInfo.eum)
-                                                .font(.system(size: 14))
-                                                .foregroundColor(.hanjaText)
-                                            Text(":")
-                                                .font(.system(size: 14))
-                                                .foregroundColor(.hanjaText)
-                                            // 급수 원기호 + 훈 + 변형 인디케이터
-                                            Group {
-                                                let gradePrefix: Text = {
-                                                    return Text(gradeSymbol(for: char) + " ")
-                                                        .foregroundColor(gradeColor(for: char))
-                                                }()
-                                                if hasMultipleVariants && cIdx == 0 {
-                                                    if vIdx == 0 {
-                                                        (gradePrefix
-                                                        + Text(charInfo.hun)
-                                                            .foregroundColor(.hanjaText)
-                                                        + Text("   ●")
-                                                            .font(.system(size: 4))
-                                                            .foregroundColor(.hanjaText)
-                                                            .baselineOffset(8))
-                                                    } else {
-                                                        (gradePrefix
-                                                        + Text(charInfo.hun)
-                                                            .foregroundColor(.hanjaText)
-                                                        + Text(" \(vIdx)")
-                                                            .font(.system(size: 9, weight: .medium))
-                                                            .foregroundColor(.hanjaText)
-                                                            .baselineOffset(6))
-                                                    }
-                                                } else {
-                                                    (gradePrefix
-                                                    + Text(charInfo.hun)
-                                                        .foregroundColor(.hanjaText))
-                                                }
-                                            }
-                                            .font(.system(size: 14))
-                                            .fixedSize(horizontal: false, vertical: true)
-                                        }
-                                    }
-                                }
-                                // 정의 표시 (2글자 이상 단어만)
-                                if activeWord.korean.count >= 2 {
-                                    definitionView(for: variant, korean: activeWord.korean)
-                                }
-                            }
-                            .id("v_\(vIdx)")
-                        }
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 14) {
+                // 상단 한자 리스트와 동일한 순서로 모든 단어의 훈/음 섹션을 쌓는다.
+                // 각 단어 섹션에 wordIndex를 .id로 부여 → scrollPosition이 단어 단위로 추적.
+                if let result = viewModel.searchResult {
+                    ForEach(Array(result.words.enumerated()), id: \.offset) { wIdx, word in
+                        hunEumWordSection(word: word, wordIndex: wIdx)
+                            .id(wIdx)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .padding(.bottom, 16)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, minHeight: 30, maxHeight: .infinity)
-            .modifier(OverlayScrollerModifier())
-            .contentMargins(.top, 12, for: .scrollContent)
-            .background(Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14))
-            // 수평 스크롤로 변형이 x=20~40 진입 시 훈/음 스크롤
-            .onChange(of: viewModel.activeVariantIndex) { _, newVIdx in
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    hunProxy.scrollTo("v_\(newVIdx)", anchor: .top)
+            .scrollTargetLayout()
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .scrollPosition(id: $middleTopWord)
+        .frame(maxWidth: .infinity, minHeight: 30, maxHeight: .infinity)
+        .modifier(OverlayScrollerModifier())
+        .contentMargins(.top, 12, for: .scrollContent)
+        .background(Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14))
+        // 중간 → 상단: 사용자가 중간을 스크롤해 상단에 걸린 단어가 바뀌면 활성 단어 갱신
+        .onChange(of: middleTopWord) { _, id in
+            guard let id, id != viewModel.activeWordIndex else { return }
+            viewModel.isMiddleDrivingSync = true
+            // 상단 follow-스크롤 애니메이션 동안 상단 위치 감지 오탐 방지 (키보드 조작과 동일 패턴)
+            viewModel.isKeyTriggered = true
+            viewModel.activeWordIndex = id
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                viewModel.isKeyTriggered = false
+            }
+        }
+        // 상단 → 중간: 활성 단어가 (상단 스크롤/키보드로) 바뀌면 그 단어로 스크롤.
+        // 단, 중간 스크롤이 유발한 변경이면 플래그만 소비하고 중간은 그대로 둔다.
+        .onChange(of: viewModel.activeWordIndex) { _, idx in
+            if viewModel.isMiddleDrivingSync {
+                viewModel.isMiddleDrivingSync = false
+                return
+            }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                middleTopWord = idx
+            }
+        }
+        // 새 검색: 맨 위로 + 펼침 초기화
+        .onChange(of: viewModel.resultToken) { _, _ in
+            expandedDefinitions.removeAll()
+            middleTopWord = 0
+        }
+        // 입력 상태로 돌아가면 펼침 초기화
+        .onChange(of: viewModel.isEditing) { _, editing in
+            if editing { expandedDefinitions.removeAll() }
+        }
+    }
+
+    /// 단어 하나의 훈/음 섹션 (변형 나열)
+    private func hunEumWordSection(word: HanjaWord, wordIndex: Int) -> some View {
+        let hasMultipleVariants = word.hanjaVariants.count > 1
+        return VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(word.hanjaVariants.enumerated()), id: \.offset) { vIdx, variant in
+                if vIdx > 0 {
+                    Spacer().frame(height: 6)
                 }
-            }
-            // 단어 변경 시 항상 맨 위로, 펼침 상태 초기화
-            .onChange(of: viewModel.activeWordIndex) { _, _ in
-                expandedDefinitions.removeAll()
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    hunProxy.scrollTo("v_0", anchor: .top)
+                // 변형 섹션 — 스크롤 앵커 ID 부여 (단어 인덱스 포함)
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(variant.enumerated()), id: \.offset) { cIdx, char in
+                        if let charInfo = word.characters.first(where: { $0.character == char }) {
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                Text(charInfo.eum)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(textColor)
+                                Text(":")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(textColor)
+                                // 급수 원기호 + 훈 + 변형 인디케이터
+                                Group {
+                                    let gradePrefix: Text = {
+                                        return Text(gradeSymbol(for: char) + " ")
+                                            .foregroundColor(gradeColor(for: char))
+                                    }()
+                                    if hasMultipleVariants && cIdx == 0 {
+                                        if vIdx == 0 {
+                                            (gradePrefix
+                                            + Text(charInfo.hun)
+                                                .foregroundColor(textColor)
+                                            + Text("   ●")
+                                                .font(.system(size: 4))
+                                                .foregroundColor(textColor)
+                                                .baselineOffset(8))
+                                        } else {
+                                            (gradePrefix
+                                            + Text(charInfo.hun)
+                                                .foregroundColor(textColor)
+                                            + Text(" \(vIdx)")
+                                                .font(.system(size: 9, weight: .medium))
+                                                .foregroundColor(textColor)
+                                                .baselineOffset(6))
+                                        }
+                                    } else {
+                                        (gradePrefix
+                                        + Text(charInfo.hun)
+                                            .foregroundColor(textColor))
+                                    }
+                                }
+                                .font(.system(size: 14))
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    // 정의 표시 (2글자 이상 단어만)
+                    if word.korean.count >= 2 {
+                        definitionView(for: variant, korean: word.korean)
+                    }
                 }
             }
         }
@@ -751,7 +797,7 @@ struct ContentView: View {
         guard !ranges.isEmpty else {
             return Text(input)
                 .font(.system(size: 16, weight: .light))
-                .foregroundColor(.hanjaText)
+                .foregroundColor(textColor)
         }
 
         var text = Text("")
@@ -762,12 +808,12 @@ struct ContentView: View {
             if cursor < range.lowerBound {
                 text = text + Text(input[cursor..<range.lowerBound])
                     .font(.system(size: 16, weight: .light))
-                    .foregroundColor(.hanjaText)
+                    .foregroundColor(textColor)
             }
             // 한자 단어 부분
             text = text + Text(input[range])
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.hanjaText)
+                .foregroundColor(textColor)
             cursor = range.upperBound
         }
 
@@ -775,7 +821,7 @@ struct ContentView: View {
         if cursor < input.endIndex {
             text = text + Text(input[cursor..<input.endIndex])
                 .font(.system(size: 16, weight: .light))
-                .foregroundColor(.hanjaText)
+                .foregroundColor(textColor)
         }
 
         return text
@@ -790,7 +836,7 @@ struct ContentView: View {
                     TextField("", text: $viewModel.inputText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.hanjaText)
+                        .foregroundColor(textColor)
                         .focused($isInputFocused)
                         .onSubmit {
                             viewModel.performSearch()
@@ -837,6 +883,13 @@ class HanjaViewModel: ObservableObject {
     @Published var activeVariantIndex: Int = 0
     var isPositionTriggered: Bool = false
     var isKeyTriggered: Bool = false
+
+    /// 중간(훈/음) 스크롤이 활성 단어를 바꾼 경우 true.
+    /// 이 변경으로 인한 중간 자동 스크롤(상단→중간)을 한 번만 소비해 되튐을 막는다.
+    var isMiddleDrivingSync: Bool = false
+
+    /// 새 검색마다 갱신 — 중간 스크롤 위치를 맨 위로 되돌리는 트리거
+    @Published var resultToken = UUID()
     @Published var definitions: [String: [String]] = [:] // 한자 → [정의]
     @Published var isLoading: Bool = false
     @Published var isEditing: Bool = true
@@ -1018,6 +1071,7 @@ class HanjaViewModel: ObservableObject {
         updateDismissed = true
         isEditing = false
         hasSearched = true
+        resultToken = UUID()   // 새 검색 → 중간 스크롤 맨 위로
 
         let result = HanjaService.shared.search(text: query)
         searchResult = result
