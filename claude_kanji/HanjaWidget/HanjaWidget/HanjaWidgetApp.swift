@@ -50,6 +50,8 @@ extension Notification.Name {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var keyWindowObserver: NSObjectProtocol?
+    /// 커스텀 스타일(테두리 제거)을 입힐 메인 콘텐츠 창. About 패널 등 보조 창은 제외.
+    private weak var mainWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 저장된 윈도우 프레임 초기화
@@ -58,17 +60,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             defaults.removeObject(forKey: key)
         }
 
-        // 창 생성 타이밍과 무관하게, 키 윈도우가 될 때마다 스타일을 보장
+        // 창 생성 타이밍과 무관하게, 키 윈도우가 될 때마다 스타일을 보장.
+        // 단, 메인 창에만 적용 — About 패널 등 나중에 뜨는 보조 창은 건드리지 않음.
         keyWindowObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeKeyNotification,
             object: nil,
             queue: .main
         ) { [weak self] notification in
             guard let window = notification.object as? NSWindow else { return }
-            self?.applyStyle(window)
+            self?.styleIfMainWindow(window)
         }
 
-        NSApplication.shared.windows.forEach(applyStyle)
+        NSApplication.shared.windows.forEach(styleIfMainWindow)
+    }
+
+    /// 첫 번째로 나타나는 콘텐츠 창을 메인 창으로 확정하고, 그 창에만 스타일 적용.
+    /// About 패널은 사용자가 메뉴를 누른 뒤에야(메인 창이 이미 확정된 후) 뜨므로 제외됨.
+    private func styleIfMainWindow(_ window: NSWindow) {
+        // 표준 About 패널 등 보조 창은 후보에서 제외
+        if mainWindow == nil, !(window is NSPanel) {
+            mainWindow = window
+        }
+        guard window === mainWindow else { return }
+        applyStyle(window)
     }
 
     private func applyStyle(_ window: NSWindow) {

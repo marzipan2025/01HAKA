@@ -373,14 +373,14 @@ struct ContentView: View {
             } else if showUpdatePrompt {
                 Text(viewModel.isUpdating
                      ? (viewModel.updateStatusText.isEmpty ? "Updating…" : viewModel.updateStatusText)
-                     : "Update\nAvailable")
-                    .font(.system(size: 29, weight: .ultraLight))
+                     : "Update Available")
+                    .font(.system(size: 30, weight: .ultraLight))
                     .foregroundColor(.hanjaText)
-                    .lineSpacing(0)
-                    .fixedSize()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .padding(.leading, 15)
-                    .padding(.top, 12)
+                    .padding(.trailing, 12)
             } else {
                 Text("漢字")
                     .font(.system(size: 56, weight: .ultraLight))
