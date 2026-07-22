@@ -365,22 +365,14 @@ struct ContentView: View {
         .disabled(viewModel.isUpdating)
     }
 
-    // 설치 후 버전 정보: 훈/음 라인과 같은 "A : B" 형식으로 바디 좌상단에 표기
+    // 설치 후 버전 정보: 훈/음 영역과 같은 스타일로 바디 좌상단에 문장으로 표기
     private var updatedVersionBody: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text("v")
-                .font(.system(size: 14))
-                .foregroundColor(.hanjaText)
-            Text(":")
-                .font(.system(size: 14))
-                .foregroundColor(.hanjaText)
-            Text(viewModel.updatedToVersion)
-                .font(.system(size: 14))
-                .foregroundColor(.hanjaText)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
+        Text("Version \(viewModel.updatedToVersion) has been installed.")
+            .font(.system(size: 14))
+            .foregroundColor(.hanjaText)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
     }
 
     // MARK: - 한자 표시 영역 (고정 높이)
