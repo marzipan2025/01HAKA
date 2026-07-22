@@ -77,6 +77,11 @@ struct ScrollViewFinder: NSViewRepresentable {
     }
 }
 
+extension Color {
+    /// 본문 텍스트 색 (#8FA1BE @ 0.6)
+    static let hanjaText = Color(red: 0x8F/255, green: 0xA1/255, blue: 0xBE/255).opacity(0.6)
+}
+
 // MARK: - Legacy background (pre-macOS 26 fallback)
 
 final class PassthroughVisualEffectView: NSVisualEffectView {
@@ -127,7 +132,8 @@ struct GlassBackgroundModifier: ViewModifier {
         if #available(macOS 26.0, *), useGlass {
             content
                 .background(
-                    Color(red: 0x7B/255, green: 0x86/255, blue: 0x98/255).opacity(0.40)
+                    // 색면 없이 유리 밑 블러 레이어만으로 가독성 확보
+                    VisualEffectBackground(material: .fullScreenUI, blendingMode: .behindWindow, alpha: 0.35)
                 )
                 .glassEffect(.clear, in: .rect(cornerRadius: 0))
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -313,7 +319,7 @@ struct ContentView: View {
                 hanjaTextView(result: result)
             } else if viewModel.hasSearched {
                 Text(viewModel.failureMessage)
-                    .foregroundColor(viewModel.isEraseMessage ? .black.opacity(0.3) : .white.opacity(0.3))
+                    .foregroundColor(viewModel.isEraseMessage ? .black.opacity(0.3) : .hanjaText)
                     .font(.system(size: 56, weight: .ultraLight))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
@@ -321,7 +327,7 @@ struct ContentView: View {
             } else {
                 Text("漢字")
                     .font(.system(size: 56, weight: .ultraLight))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(.hanjaText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
                     .padding(.top, 12)
@@ -338,11 +344,11 @@ struct ContentView: View {
             let weights: [Font.Weight] = [.ultraLight, .light, .medium]
             let weight = weights[min(tier, weights.count - 1)]
             let color: Color = {
-                if !isActive { return .white.opacity(0.45) }
+                if !isActive { return .hanjaText }
                 if tier >= 5 { return .black }
                 else if tier >= 4 { return Color(red: 1, green: 1, blue: 0) }
                 else if tier >= 3 { return Color(red: 1, green: 0xFC/255, blue: 0xCB/255) }
-                return .white
+                return .hanjaText
             }()
             text = text + Text(String(char))
                 .font(.system(size: 56, weight: weight))
@@ -359,7 +365,7 @@ struct ContentView: View {
             } else {
                 text = text + Text(" \(vIdx)")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.hanjaText)
                     .baselineOffset(38)
             }
         }
@@ -376,7 +382,7 @@ struct ContentView: View {
                 text = text + Text(", ")
                     .font(.system(size: 42, weight: .ultraLight))
                     .baselineOffset(-10)
-                    .foregroundColor(isActive ? .white.opacity(0.5) : .white.opacity(0.15))
+                    .foregroundColor(isActive ? .hanjaText : .hanjaText)
             }
             text = text + buildVariantText(variant: variant, vIdx: vIdx, isActive: isActive, hasMultipleVariants: hasMultipleVariants)
         }
@@ -392,7 +398,7 @@ struct ContentView: View {
                     Text(", ")
                         .font(.system(size: 30, weight: .ultraLight))
                         .baselineOffset(-22)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(.hanjaText)
                 }
                 buildVariantText(variant: variant, vIdx: vIdx, isActive: true, hasMultipleVariants: true)
                     .textSelection(.enabled)
@@ -494,14 +500,14 @@ struct ContentView: View {
     /// 급수별 색상 반환
     private func gradeColor(for char: Character) -> Color {
         guard let grade = hanjaGradeMap[char] else {
-            return .white.opacity(0.2)
+            return .hanjaText
         }
         switch grade {
         case 0: return .black
         case 1: return Color(red: 0.16, green: 0.60, blue: 0.82)
         case 2: return .yellow
         case 3: return Color(red: 0.7, green: 0.85, blue: 0.5)
-        default: return .white.opacity(0.6)
+        default: return .hanjaText
         }
     }
 
@@ -522,10 +528,10 @@ struct ContentView: View {
                                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                                             Text(charInfo.eum)
                                                 .font(.system(size: 14))
-                                                .foregroundColor(.white.opacity(0.85))
+                                                .foregroundColor(.hanjaText)
                                             Text(":")
                                                 .font(.system(size: 14))
-                                                .foregroundColor(.white.opacity(0.85))
+                                                .foregroundColor(.hanjaText)
                                             // 급수 원기호 + 훈 + 변형 인디케이터
                                             Group {
                                                 let gradePrefix: Text = {
@@ -536,24 +542,24 @@ struct ContentView: View {
                                                     if vIdx == 0 {
                                                         (gradePrefix
                                                         + Text(charInfo.hun)
-                                                            .foregroundColor(.white.opacity(0.85))
+                                                            .foregroundColor(.hanjaText)
                                                         + Text("   ●")
                                                             .font(.system(size: 4))
-                                                            .foregroundColor(.white)
+                                                            .foregroundColor(.hanjaText)
                                                             .baselineOffset(8))
                                                     } else {
                                                         (gradePrefix
                                                         + Text(charInfo.hun)
-                                                            .foregroundColor(.white.opacity(0.85))
+                                                            .foregroundColor(.hanjaText)
                                                         + Text(" \(vIdx)")
                                                             .font(.system(size: 9, weight: .medium))
-                                                            .foregroundColor(.white.opacity(0.8))
+                                                            .foregroundColor(.hanjaText)
                                                             .baselineOffset(6))
                                                     }
                                                 } else {
                                                     (gradePrefix
                                                     + Text(charInfo.hun)
-                                                        .foregroundColor(.white.opacity(0.85)))
+                                                        .foregroundColor(.hanjaText))
                                                 }
                                             }
                                             .font(.system(size: 14))
@@ -655,7 +661,7 @@ struct ContentView: View {
         guard !ranges.isEmpty else {
             return Text(input)
                 .font(.system(size: 16, weight: .light))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(.hanjaText)
         }
 
         var text = Text("")
@@ -666,12 +672,12 @@ struct ContentView: View {
             if cursor < range.lowerBound {
                 text = text + Text(input[cursor..<range.lowerBound])
                     .font(.system(size: 16, weight: .light))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(.hanjaText)
             }
             // 한자 단어 부분
             text = text + Text(input[range])
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundColor(.hanjaText)
             cursor = range.upperBound
         }
 
@@ -679,7 +685,7 @@ struct ContentView: View {
         if cursor < input.endIndex {
             text = text + Text(input[cursor..<input.endIndex])
                 .font(.system(size: 16, weight: .light))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(.hanjaText)
         }
 
         return text
@@ -694,7 +700,7 @@ struct ContentView: View {
                     TextField("", text: $viewModel.inputText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.hanjaText)
                         .focused($isInputFocused)
                         .onSubmit {
                             viewModel.performSearch()
