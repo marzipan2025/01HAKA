@@ -170,6 +170,8 @@ struct ContentView: View {
                 .overlay {
                     if showUpdatePrompt {
                         updateButton
+                    } else if showUpdatedNotice {
+                        updatedVersionBody
                     }
                 }
 
@@ -207,17 +209,27 @@ struct ContentView: View {
                 viewModel?.resetToEditing()
                 self.refocusInputIfNeeded()
             }
+            viewModel.checkPostUpdate()
             viewModel.checkForUpdate()
         }
     }
 
-    /// 업데이트 안내를 보여줄 조건: 새 버전 있음 + 아직 검색 전(초기 화면)
-    private var showUpdatePrompt: Bool {
-        viewModel.updateAvailable
-            && !viewModel.updateDismissed
-            && viewModel.isEditing
+    /// 초기 화면(검색 전) 여부
+    private var isIdleScreen: Bool {
+        viewModel.isEditing
             && !viewModel.hasSearched
             && viewModel.searchResult == nil
+    }
+
+    /// 업데이트 안내를 보여줄 조건: 새 버전 있음 + 초기 화면 + 미해제 + 방금 업데이트한 게 아님
+    private var showUpdatePrompt: Bool {
+        viewModel.updateAvailable && !viewModel.updateDismissed
+            && !viewModel.justUpdated && isIdleScreen
+    }
+
+    /// 설치 후 재실행 안내를 보여줄 조건: 방금 업데이트됨 + 초기 화면 + 미해제
+    private var showUpdatedNotice: Bool {
+        viewModel.justUpdated && !viewModel.updateDismissed && isIdleScreen
     }
 
     private func setWindowLevel(_ level: NSWindow.Level) {
@@ -353,6 +365,24 @@ struct ContentView: View {
         .disabled(viewModel.isUpdating)
     }
 
+    // 설치 후 버전 정보: 훈/음 라인과 같은 "A : B" 형식으로 바디 좌상단에 표기
+    private var updatedVersionBody: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text("v")
+                .font(.system(size: 14))
+                .foregroundColor(.hanjaText)
+            Text(":")
+                .font(.system(size: 14))
+                .foregroundColor(.hanjaText)
+            Text(viewModel.updatedToVersion)
+                .font(.system(size: 14))
+                .foregroundColor(.hanjaText)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+    }
+
     // MARK: - 한자 표시 영역 (고정 높이)
 
     private var hanjaDisplayArea: some View {
@@ -367,6 +397,14 @@ struct ContentView: View {
                 Text(viewModel.failureMessage)
                     .foregroundColor(viewModel.isEraseMessage ? .black.opacity(0.3) : .hanjaText)
                     .font(.system(size: 56, weight: .ultraLight))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, 14)
+                    .padding(.top, 10)
+            } else if showUpdatedNotice {
+                // 설치 후 재실행: 실패 메시지와 동일 규칙(56pt, 축소 없이 잘림)
+                Text("Updated")
+                    .font(.system(size: 56, weight: .ultraLight))
+                    .foregroundColor(.hanjaText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
                     .padding(.top, 10)
@@ -821,6 +859,10 @@ class HanjaViewModel: ObservableObject {
     private var updateDMGURL: URL?
     private var didCheckUpdate = false
 
+    /// 설치 후 재실행되었을 때만 true (설치 헬퍼가 -updatedTo 인자로 알림)
+    @Published var justUpdated: Bool = false
+    @Published var updatedToVersion: String = ""
+
     private var keyMonitor: Any?
     private var resetAction: (() -> Void)?
     private var audioPlayer: AVAudioPlayer?
@@ -932,6 +974,15 @@ class HanjaViewModel: ObservableObject {
     // MARK: - 자동 업데이트
 
     /// 앱 실행 시 1회: GitHub 최신 릴리스를 확인해 새 버전이 있으면 안내 노출
+    /// 설치 헬퍼가 `open --args -updatedTo <버전>`으로 재실행하면 그 버전을 읽어 "Updated" 표시.
+    /// 인자 도메인 값이라 다음 일반 실행 때 자동으로 사라짐.
+    func checkPostUpdate() {
+        if let version = UserDefaults.standard.string(forKey: "updatedTo"), !version.isEmpty {
+            updatedToVersion = version
+            justUpdated = true
+        }
+    }
+
     func checkForUpdate() {
         guard !didCheckUpdate else { return }
         didCheckUpdate = true
