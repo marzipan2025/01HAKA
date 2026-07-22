@@ -154,6 +154,11 @@ struct ContentView: View {
     @State private var isTrafficLightHovered = false
     @State private var isWindowActive = true
 
+    /// 현재 마우스가 올라가 있어 스크롤 대상이 되는 영역 (상단 한자 / 중간 훈·음).
+    /// 스크롤은 커서 아래 영역으로 가므로, 이 값으로 두 영역의 위치 감지기를 배타적으로 게이트한다.
+    enum ScrollFocus { case none, top, middle }
+    @State private var scrollFocus: ScrollFocus = .none
+
     /// 리퀴드 글래스가 실제로 보이는 상태 (배경 모디파이어 조건과 일치)
     private var isLiquidActive: Bool {
         if #available(macOS 26.0, *) {
@@ -177,11 +182,13 @@ struct ContentView: View {
             hanjaDisplayArea
                 .frame(maxWidth: .infinity)
                 .frame(height: 84)
+                .onHover { if $0 { scrollFocus = .top } else if scrollFocus == .top { scrollFocus = .none } }
 
             // 중단: 훈/음 표시 (가변 높이)
             hunEumArea
                 .frame(maxWidth: .infinity)
                 .layoutPriority(1)
+                .onHover { if $0 { scrollFocus = .middle } else if scrollFocus == .middle { scrollFocus = .none } }
                 .overlay {
                     if showUpdatePrompt {
                         updateButton
@@ -514,6 +521,8 @@ struct ContentView: View {
                             let minX = geo.frame(in: .named("hanjaScroll")).minX
                             Color.clear
                                 .onChange(of: minX) { _, x in
+                                    // 상단을 스크롤 중일 때만 변형 감지 (중간 follow 중에는 무시)
+                                    guard scrollFocus == .top else { return }
                                     if x >= 20 && x <= 40 {
                                         viewModel.activeVariantIndex = vIdx
                                     }
@@ -573,8 +582,8 @@ struct ContentView: View {
             let minX = geo.frame(in: .named("hanjaScroll")).minX
             Color.clear
                 .onChange(of: minX) { _, x in
-                    // 키보드 방향키로 변경 중에는 위치 감지 무시
-                    guard !viewModel.isKeyTriggered else { return }
+                    // 사용자가 상단을 스크롤 중일 때만 감지 (중간 follow 스크롤/키보드는 무시)
+                    guard scrollFocus == .top, !viewModel.isKeyTriggered else { return }
                     // 순방향: 다른 단어가 x=20~40 구간 진입 → 해당 단어 활성화
                     if x >= 20 && x <= 40 && viewModel.activeWordIndex != wordIndex {
                         viewModel.isPositionTriggered = true
@@ -594,8 +603,6 @@ struct ContentView: View {
     // MARK: - 훈/음 영역 (가변 높이, 항상 표시)
 
     @State private var expandedDefinitions: Set<String> = []
-    /// 중간(훈/음) 스크롤 위치 추적용 — 뷰포트 상단에 걸린 단어의 인덱스
-    @State private var middleTopWord: Int? = 0
 
     /// 급수 원기호 반환
     private func gradeSymbol(for char: Character) -> String {
@@ -619,58 +626,73 @@ struct ContentView: View {
     }
 
     private var hunEumArea: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 14) {
-                // 상단 한자 리스트와 동일한 순서로 모든 단어의 훈/음 섹션을 쌓는다.
-                // 각 단어 섹션에 wordIndex를 .id로 부여 → scrollPosition이 단어 단위로 추적.
-                if let result = viewModel.searchResult {
-                    ForEach(Array(result.words.enumerated()), id: \.offset) { wIdx, word in
-                        hunEumWordSection(word: word, wordIndex: wIdx)
-                            .id(wIdx)
+        ScrollViewReader { hunProxy in
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 14) {
+                    // 상단 한자 리스트와 동일한 순서로 모든 단어의 훈/음 섹션을 쌓는다.
+                    if let result = viewModel.searchResult {
+                        ForEach(Array(result.words.enumerated()), id: \.offset) { wIdx, word in
+                            hunEumWordSection(word: word, wordIndex: wIdx)
+                                .id("w_\(wIdx)")
+                                .background(hunWordTracker(wordIndex: wIdx))
+                        }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .scrollTargetLayout()
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .padding(.bottom, 16)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-        .scrollPosition(id: $middleTopWord)
-        .frame(maxWidth: .infinity, minHeight: 30, maxHeight: .infinity)
-        .modifier(OverlayScrollerModifier())
-        .contentMargins(.top, 12, for: .scrollContent)
-        .background(Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14))
-        // 중간 → 상단: 사용자가 중간을 스크롤해 상단에 걸린 단어가 바뀌면 활성 단어 갱신
-        .onChange(of: middleTopWord) { _, id in
-            guard let id, id != viewModel.activeWordIndex else { return }
-            viewModel.isMiddleDrivingSync = true
-            // 상단 follow-스크롤 애니메이션 동안 상단 위치 감지 오탐 방지 (키보드 조작과 동일 패턴)
-            viewModel.isKeyTriggered = true
-            viewModel.activeWordIndex = id
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                viewModel.isKeyTriggered = false
+            .coordinateSpace(name: "hunScroll")
+            .frame(maxWidth: .infinity, minHeight: 30, maxHeight: .infinity)
+            .modifier(OverlayScrollerModifier())
+            .contentMargins(.top, 12, for: .scrollContent)
+            .background(Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14))
+            // 상단 → 중간: 활성 단어가 (상단 스크롤/키보드로) 바뀌면 그 단어 섹션으로 스크롤.
+            // 단, 지금 사용자가 중간을 스크롤 중이면(중간이 유발한 변경) 중간을 건드리지 않는다.
+            .onChange(of: viewModel.activeWordIndex) { _, idx in
+                guard scrollFocus != .middle else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    hunProxy.scrollTo("w_\(idx)_v_0", anchor: .top)
+                }
+            }
+            // 상단 → 중간(변형 단위): 상단에서 같은 단어의 변형을 훑으면 그 변형으로 스크롤.
+            .onChange(of: viewModel.activeVariantIndex) { _, vIdx in
+                guard scrollFocus != .middle else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    hunProxy.scrollTo("w_\(viewModel.activeWordIndex)_v_\(vIdx)", anchor: .top)
+                }
+            }
+            // 새 검색: 맨 위로 + 펼침 초기화
+            .onChange(of: viewModel.resultToken) { _, _ in
+                expandedDefinitions.removeAll()
+                hunProxy.scrollTo("w_0", anchor: .top)
+            }
+            // 입력 상태로 돌아가면 펼침 초기화
+            .onChange(of: viewModel.isEditing) { _, editing in
+                if editing { expandedDefinitions.removeAll() }
             }
         }
-        // 상단 → 중간: 활성 단어가 (상단 스크롤/키보드로) 바뀌면 그 단어로 스크롤.
-        // 단, 중간 스크롤이 유발한 변경이면 플래그만 소비하고 중간은 그대로 둔다.
-        .onChange(of: viewModel.activeWordIndex) { _, idx in
-            if viewModel.isMiddleDrivingSync {
-                viewModel.isMiddleDrivingSync = false
-                return
-            }
-            withAnimation(.easeInOut(duration: 0.2)) {
-                middleTopWord = idx
-            }
-        }
-        // 새 검색: 맨 위로 + 펼침 초기화
-        .onChange(of: viewModel.resultToken) { _, _ in
-            expandedDefinitions.removeAll()
-            middleTopWord = 0
-        }
-        // 입력 상태로 돌아가면 펼침 초기화
-        .onChange(of: viewModel.isEditing) { _, editing in
-            if editing { expandedDefinitions.removeAll() }
+    }
+
+    /// 중간 → 상단: 각 단어 섹션의 상단(minY)을 감지해 뷰포트 상단에 걸린 단어를 활성화.
+    /// 수동적 감지라 스크롤 자체는 전혀 제약하지 않는다(끝까지 스크롤 가능).
+    private func hunWordTracker(wordIndex: Int) -> some View {
+        GeometryReader { geo in
+            let minY = geo.frame(in: .named("hunScroll")).minY
+            Color.clear
+                .onChange(of: minY) { _, y in
+                    // 사용자가 중간을 스크롤 중일 때만 감지 (상단 follow 스크롤은 무시)
+                    guard scrollFocus == .middle else { return }
+                    // 아래로 스크롤: 뒤 단어 섹션 상단이 뷰포트 위쪽에 도달 → 활성화
+                    if y < 40 && wordIndex > viewModel.activeWordIndex {
+                        viewModel.middleDidReachWord(wordIndex)
+                    }
+                    // 위로 스크롤: 활성 단어 상단이 아래로 밀려나면 → 이전 단어 활성화
+                    else if y > 60 && wordIndex == viewModel.activeWordIndex && wordIndex > 0 {
+                        viewModel.middleDidReachWord(wordIndex - 1)
+                    }
+                }
         }
     }
 
@@ -733,6 +755,8 @@ struct ContentView: View {
                         definitionView(for: variant, korean: word.korean)
                     }
                 }
+                // 변형 단위 스크롤 앵커 (단어+변형 인덱스)
+                .id("w_\(wordIndex)_v_\(vIdx)")
             }
         }
     }
@@ -884,12 +908,15 @@ class HanjaViewModel: ObservableObject {
     var isPositionTriggered: Bool = false
     var isKeyTriggered: Bool = false
 
-    /// 중간(훈/음) 스크롤이 활성 단어를 바꾼 경우 true.
-    /// 이 변경으로 인한 중간 자동 스크롤(상단→중간)을 한 번만 소비해 되튐을 막는다.
-    var isMiddleDrivingSync: Bool = false
-
     /// 새 검색마다 갱신 — 중간 스크롤 위치를 맨 위로 되돌리는 트리거
     @Published var resultToken = UUID()
+
+    /// 중간 스크롤 감지로 단어 도달 → 활성 단어 갱신 (상단이 따라 스크롤됨).
+    /// 어느 영역을 스크롤 중인지는 hover(scrollFocus)로 중재하므로 별도 타이밍 플래그가 필요 없다.
+    func middleDidReachWord(_ index: Int) {
+        guard index != activeWordIndex else { return }
+        activeWordIndex = index
+    }
     @Published var definitions: [String: [String]] = [:] // 한자 → [정의]
     @Published var isLoading: Bool = false
     @Published var isEditing: Bool = true
