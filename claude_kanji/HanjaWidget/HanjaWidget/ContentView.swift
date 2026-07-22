@@ -78,8 +78,8 @@ struct ScrollViewFinder: NSViewRepresentable {
 }
 
 extension Color {
-    /// 본문 텍스트 색 (#8FA1BE @ 0.6) — 리퀴드 모드 활성일 때
-    static let hanjaText = Color(red: 0x8F/255, green: 0xA1/255, blue: 0xBE/255).opacity(0.6)
+    /// 본문 텍스트 색 (#8698B5 @ 0.6) — 리퀴드 모드 활성일 때 (기존 #8FA1BE에서 각 채널 -0x09)
+    static let hanjaText = Color(red: 0x86/255, green: 0x98/255, blue: 0xB5/255).opacity(0.6)
     /// 비리퀴드(불투명/포커스아웃) 상태의 본문 텍스트 색 — 위 색보다 30% 어둡게 (#647185 @ 0.8)
     static let hanjaTextDim = Color(red: 0x64/255, green: 0x71/255, blue: 0x85/255).opacity(0.8)
 }
