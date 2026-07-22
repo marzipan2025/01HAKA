@@ -371,16 +371,15 @@ struct ContentView: View {
                     .padding(.leading, 14)
                     .padding(.top, 10)
             } else if showUpdatePrompt {
+                // 실패 메시지와 동일 규칙: 한자와 같은 56pt, 축소 없이 넘치면 잘림
                 Text(viewModel.isUpdating
                      ? (viewModel.updateStatusText.isEmpty ? "Updating…" : viewModel.updateStatusText)
                      : "Update Available")
-                    .font(.system(size: 30, weight: .ultraLight))
+                    .font(.system(size: 56, weight: .ultraLight))
                     .foregroundColor(.hanjaText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .padding(.leading, 15)
-                    .padding(.trailing, 12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, 14)
+                    .padding(.top, 10)
             } else {
                 Text("漢字")
                     .font(.system(size: 56, weight: .ultraLight))
