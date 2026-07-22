@@ -310,12 +310,16 @@ struct ContentView: View {
             setWindowLevel(viewModel.isAlwaysOnTop ? .floating : .normal)
         }) {
             Image("onTop")
+                .renderingMode(.template)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 26, height: 26)
                 .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
-                .opacity(viewModel.isAlwaysOnTop ? 1.0 : 0.5)
+                // 핀 됨: #181818 @0.8 / 안 됨: 글자색(#8FA1BE)에서 0.1 더 투명한 @0.5
+                .foregroundColor(viewModel.isAlwaysOnTop
+                    ? Color(red: 0x18/255, green: 0x18/255, blue: 0x18/255).opacity(0.8)
+                    : Color(red: 0x8F/255, green: 0xA1/255, blue: 0xBE/255).opacity(0.5))
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
