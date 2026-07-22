@@ -374,7 +374,7 @@ struct ContentView: View {
                 // 실패 메시지와 동일 규칙: 한자와 같은 56pt, 축소 없이 넘치면 잘림
                 Text(viewModel.isUpdating
                      ? (viewModel.updateStatusText.isEmpty ? "Updating…" : viewModel.updateStatusText)
-                     : "Update Available")
+                     : "New Update")
                     .font(.system(size: 56, weight: .ultraLight))
                     .foregroundColor(.hanjaText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
