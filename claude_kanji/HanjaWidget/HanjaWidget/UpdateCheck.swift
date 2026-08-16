@@ -57,7 +57,7 @@ enum UpdateCheck {
                 try? FileManager.default.removeItem(at: dmgDest)
                 try FileManager.default.moveItem(at: tmp, to: dmgDest)
 
-                onStatus("Installing…")
+                onStatus("Install & Relaunch")
                 guard let mountPoint = await attachDMG(at: dmgDest.path) else {
                     throw UpdateError.mountFailed
                 }

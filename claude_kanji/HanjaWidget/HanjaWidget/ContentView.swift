@@ -257,10 +257,21 @@ struct ContentView: View {
                 .frame(height: 50)
         }
         .padding(0)
+        // Esc 를 두 경로로 받는다 — 아래 escapeToCloseSettings 주석 참고.
+        .onExitCommand {
+            guard viewModel.isShowingSettings else { return }
+            viewModel.closeSettings()
+            refocusInputIfNeeded()
+        }
+        .background(escapeToCloseSettings)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minWidth: 310, minHeight: 270)
         .modifier(GlassBackgroundModifier(appearance: appearance))
         .ignoresSafeArea()
+        // 첫 글자를 넣는 순간 사전을 쓰겠다는 뜻 — 업데이트 안내는 비켜준다
+        .onChange(of: viewModel.inputText) { _, text in
+            if !text.isEmpty { viewModel.updateDismissed = true }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             isWindowActive = true
         }
@@ -297,6 +308,27 @@ struct ContentView: View {
             }
             viewModel.checkPostUpdate()
             viewModel.checkForUpdate()
+        }
+    }
+
+    /// Esc 로 설정 나가기 — 위 onExitCommand 와 짝을 이루는 두 번째 경로.
+    ///
+    /// keyDown 모니터로 잡는 방법은 쓰지 않았다. 이 앱은 한자 사전이라 한글 입력기가
+    /// 켜진 채로 쓰는 게 정상인데, 한글 입력기는 Esc 를 조합 취소/영문 전환에 쓰느라
+    /// 먼저 가져갈 수 있다. 키 equivalent 는 입력기보다 앞선 단계에서 처리되므로
+    /// onExitCommand 가 입력기에 막히는 경우까지 이쪽이 받아낸다.
+    /// 설정이 열려 있을 때만 존재해서 다른 Esc 동작을 가로채지 않는다.
+    @ViewBuilder
+    private var escapeToCloseSettings: some View {
+        if viewModel.isShowingSettings {
+            Button("") {
+                viewModel.closeSettings()
+                refocusInputIfNeeded()
+            }
+            .keyboardShortcut(.cancelAction)
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(true)
         }
     }
 
@@ -436,9 +468,13 @@ struct ContentView: View {
 
     // MARK: - 업데이트 버튼 (가운데 패널)
 
+    /// 본문 섹션 정중앙에 놓이는 업데이트 버튼. 눌러서 받는 동안에는 같은 자리에서
+    /// 진행 상태(Downloading… → Install & Relaunch)로 글자만 바뀐다.
     private var updateButton: some View {
         Button(action: { viewModel.startUpdate() }) {
-            Text(viewModel.isUpdating ? "Updating…" : "Update to v \(viewModel.latestVersion)")
+            Text(viewModel.isUpdating
+                 ? (viewModel.updateStatusText.isEmpty ? "Updating…" : viewModel.updateStatusText)
+                 : "Update to \(viewModel.latestVersion)")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(textColor)
                 .padding(.horizontal, 18)
@@ -456,14 +492,18 @@ struct ContentView: View {
         .disabled(viewModel.isUpdating)
     }
 
-    // 설치 후 버전 정보: 훈/음 영역과 같은 스타일로 바디 좌상단에 문장으로 표기
+    // 설치 후 결과 상세 — 업데이트 버튼이 있던 자리(본문 정중앙)를 그대로 이어받는다
     private var updatedVersionBody: some View {
-        Text("Version \(viewModel.updatedToVersion) has been installed.")
-            .font(.system(size: 14))
-            .foregroundColor(textColor)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
+        VStack(spacing: 4) {
+            Text("Version \(viewModel.updatedToVersion) has been installed.")
+                .font(.system(size: 14))
+                .foregroundColor(textColor)
+            Text("Relaunched and ready to use.")
+                .font(.system(size: 12))
+                .foregroundColor(secondaryText())
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 16)
     }
 
     // MARK: - 한자 표시 영역 (고정 높이)
@@ -500,10 +540,9 @@ struct ContentView: View {
                     .padding(.leading, 14)
                     .padding(.top, 10)
             } else if showUpdatePrompt {
-                // 실패 메시지와 동일 규칙: 한자와 같은 56pt, 축소 없이 넘치면 잘림
-                Text(viewModel.isUpdating
-                     ? (viewModel.updateStatusText.isEmpty ? "Updating…" : viewModel.updateStatusText)
-                     : "New Update")
+                // 새 버전 안내는 팝업이 아니라 한자부에 — 검색 결과가 앉는 자리와 같은 규칙.
+                // 진행 상태(Downloading…)는 본문 버튼이 맡으므로 여기는 늘 更新 + 버전.
+                Text("New Update")
                     .font(.system(size: 56, weight: .ultraLight))
                     .foregroundColor(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -692,6 +731,7 @@ struct ContentView: View {
 
                 settingsSection("읽는 법", [
                     ("❶ ⑧", "훈 앞의 원기호는 배정 급수입니다. ● 는 특급, 숫자가 클수록 쉬운 급수."),
+                    ("색", "3급 이상은 색으로도 구분합니다 — 특급 검정, 1급 파랑, 2급 노랑, 3급 연두. 4급부터는 본문과 같은 색."),
                     ("●  1  2", "같은 말을 여러 한자로 쓸 때 ● 가 첫 번째, 숫자가 그 다음 표기입니다."),
                     ("+  −", "단어 뜻을 펼치고 접습니다."),
                     ("굵기", "자주 찾은 글자일수록 굵고 진해집니다. 열 번마다 한 단계씩."),
@@ -699,10 +739,11 @@ struct ContentView: View {
 
                 settingsSection("단축키", [
                     ("⌘ ,", "설정 열고 닫기"),
+                    ("esc", "설정에서 나가기"),
                     ("⌘ O", "검색 기록 폴더 열기"),
                     ("⌘ E", "검색 기록 지우기"),
                     ("⌘ T", "창을 항상 위에"),
-                    ("⌘ G", "겉모습 순환 — 유리 → 라이트 → 다크"),
+                    ("⌘ G", "겉모습 순환: 유리 → 라이트 → 다크"),
                     ("← →", "결과에서 앞뒤 단어로 이동"),
                     ("↩", "새 검색 시작"),
                 ])
@@ -1072,8 +1113,9 @@ struct ContentView: View {
                 if viewModel.isShowingSettings {
                     // 설정 중에는 입력 비활성 — TextField 자체를 걷어내 포커스가 잡히지 않게 한다
                     Text(UpdateCheck.appVersion.isEmpty ? "" : "v \(UpdateCheck.appVersion)")
-                        .font(.system(size: 16, weight: .light))
-                        .foregroundColor(textColor.opacity(0.55))
+                        .font(.system(size: 15, weight: .light))
+                        // 라이트 기준 검정 — 다크에서는 흰색으로 뒤집힌다
+                        .foregroundColor(emphasisColor)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else if viewModel.isEditing {
                     TextField("", text: $viewModel.inputText)
@@ -1152,7 +1194,8 @@ class HanjaViewModel: ObservableObject {
     @Published var latestVersion: String = ""
     @Published var isUpdating: Bool = false
     @Published var updateStatusText: String = ""
-    /// 검색을 한 번이라도 하면 이번 세션 동안 업데이트 안내를 숨김
+    /// 입력을 시작하거나 검색을 하면 이번 세션 동안 업데이트 안내를 숨김.
+    /// 안내는 앱을 켠 직후 빈 화면에서만 자리를 차지하고, 사전을 쓰기 시작하면 비켜준다.
     @Published var updateDismissed: Bool = false
     private var updateDMGURL: URL?
     private var didCheckUpdate = false
@@ -1274,7 +1317,8 @@ class HanjaViewModel: ObservableObject {
         guard keyMonitor == nil else { return }
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // 설정 중에는 방향키·엔터가 뒤에 가려진 검색 결과를 건드리지 않게 흘려보낸다
+            // 설정 중에는 방향키·엔터가 뒤에 가려진 검색 결과를 건드리지 않게 흘려보낸다.
+            // (설정 나가기 Esc 는 여기서 처리하지 않는다 — 아래 escapeToCloseSettings 참고)
             guard let self = self, !self.isEditing, !self.isShowingSettings else { return event }
 
             switch event.keyCode {
