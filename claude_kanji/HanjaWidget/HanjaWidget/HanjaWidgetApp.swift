@@ -13,6 +13,15 @@ struct HanjaWidgetApp: App {
         .defaultSize(width: 310, height: 270)
         .windowResizability(.contentMinSize)
         .commands {
+            // 표준 Settings 자리를 그대로 쓴다 — 별도 창을 띄우지 않고 본 화면을
+            // 설정 모드로 전환하는 신호만 보낸다.
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings") {
+                    NotificationCenter.default.post(name: .hanjaOpenSettings, object: nil)
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Open History") {
                     SearchHistoryStore.openHistoryFolder()
@@ -46,6 +55,7 @@ extension Notification.Name {
     static let hanjaEraseRecords = Notification.Name("hanjaEraseRecords")
     static let hanjaToggleAlwaysOnTop = Notification.Name("hanjaToggleAlwaysOnTop")
     static let hanjaToggleGlassEffect = Notification.Name("hanjaToggleGlassEffect")
+    static let hanjaOpenSettings = Notification.Name("hanjaOpenSettings")
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {

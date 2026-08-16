@@ -184,18 +184,25 @@ struct ContentView: View {
                 .frame(height: 84)
                 .onHover { if $0 { scrollFocus = .top } else if scrollFocus == .top { scrollFocus = .none } }
 
-            // 중단: 훈/음 표시 (가변 높이)
-            hunEumArea
-                .frame(maxWidth: .infinity)
-                .layoutPriority(1)
-                .onHover { if $0 { scrollFocus = .middle } else if scrollFocus == .middle { scrollFocus = .none } }
-                .overlay {
-                    if showUpdatePrompt {
-                        updateButton
-                    } else if showUpdatedNotice {
-                        updatedVersionBody
-                    }
+            // 중단: 훈/음 표시 (가변 높이). 설정 모드에서는 같은 자리를 설정 본문이 차지한다 —
+            // 겹치면 훈/음 스크롤이 뒤에서 계속 잡히므로 덮지 않고 갈아끼운다.
+            Group {
+                if viewModel.isShowingSettings {
+                    settingsArea
+                } else {
+                    hunEumArea
+                        .onHover { if $0 { scrollFocus = .middle } else if scrollFocus == .middle { scrollFocus = .none } }
+                        .overlay {
+                            if showUpdatePrompt {
+                                updateButton
+                            } else if showUpdatedNotice {
+                                updatedVersionBody
+                            }
+                        }
                 }
+            }
+            .frame(maxWidth: .infinity)
+            .layoutPriority(1)
 
             // 하단: 입력 영역 (고정 높이)
             inputArea
@@ -224,6 +231,15 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .hanjaToggleGlassEffect)) { _ in
             useGlassEffect.toggle()
             refocusInputIfNeeded()
+        }
+        // ⌘, 는 토글 — 설정에 들어간 단축키로 그대로 나올 수 있다.
+        .onReceive(NotificationCenter.default.publisher(for: .hanjaOpenSettings)) { _ in
+            viewModel.toggleSettings()
+            if viewModel.isShowingSettings {
+                isInputFocused = false
+            } else {
+                refocusInputIfNeeded()
+            }
         }
         .onAppear {
             refocusInputIfNeeded()
@@ -352,17 +368,17 @@ struct ContentView: View {
     }
 
     private func refocusInputIfNeeded() {
-        guard viewModel.isEditing else { return }
+        guard viewModel.isEditing, !viewModel.isShowingSettings else { return }
 
         for delay in [0.0, 0.05, 0.15] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard viewModel.isEditing else { return }
+                guard viewModel.isEditing, !viewModel.isShowingSettings else { return }
                 if let window = NSApplication.shared.windows.first(where: { $0.isVisible }) {
                     window.makeKeyAndOrderFront(nil)
                 }
                 isInputFocused = false
                 DispatchQueue.main.async {
-                    guard viewModel.isEditing else { return }
+                    guard viewModel.isEditing, !viewModel.isShowingSettings else { return }
                     isInputFocused = true
                 }
             }
@@ -405,7 +421,15 @@ struct ContentView: View {
 
     private var hanjaDisplayArea: some View {
         Group {
-            if viewModel.isLoading {
+            if viewModel.isShowingSettings {
+                // 설정 모드 표제 — 초기 화면의 "漢字"와 같은 자리·같은 규칙
+                Text("設定")
+                    .font(.system(size: 56, weight: .ultraLight))
+                    .foregroundColor(textColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, 14)
+                    .padding(.top, 12)
+            } else if viewModel.isLoading {
                 ProgressView()
                     .scaleEffect(0.8)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -598,6 +622,143 @@ struct ContentView: View {
                     }
                 }
         }
+    }
+
+    // MARK: - 설정 영역 (⌘,)
+
+    /// 설정 본문. 훈/음 영역과 같은 배경·스크롤러를 써서 같은 자리에 그대로 갈아끼워진다.
+    private var settingsArea: some View {
+        ScrollViewReader { proxy in
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 18) {
+                updateRow
+                    .id("settingsTop")
+
+                settingsSection("검색", [
+                    ("한자", "한글 단어나 문장을 넣으면 두 글자 이상인 말을 한자로 바꿔 보여줍니다."),
+                    ("모", "한 글자만 넣으면 그 음을 가진 한자를 모두 모아 보여줍니다."),
+                    ("(어미 모)", "괄호 안에 훈과 음을 함께 넣으면 그 글자를 콕 집어 찾습니다."),
+                    ("(어미)", "괄호 안에 훈만 넣으면 훈에 그 말이 들어간 한자를 모두 찾습니다."),
+                ])
+
+                settingsSection("읽는 법", [
+                    ("❶ ⑧", "훈 앞의 원기호는 배정 급수입니다. ● 는 특급, 숫자가 클수록 쉬운 급수."),
+                    ("●  1  2", "같은 말을 여러 한자로 쓸 때 ● 가 첫 번째, 숫자가 그 다음 표기입니다."),
+                    ("+  −", "단어 뜻을 펼치고 접습니다."),
+                    ("굵기", "자주 찾은 글자일수록 굵고 진해집니다. 열 번마다 한 단계씩."),
+                ])
+
+                settingsSection("단축키", [
+                    ("⌘ ,", "설정 열고 닫기"),
+                    ("⌘ O", "검색 기록 폴더 열기"),
+                    ("⌘ E", "검색 기록 지우기"),
+                    ("⌘ T", "창을 항상 위에"),
+                    ("⌘ G", "유리 효과 켜고 끄기"),
+                    ("← →", "결과에서 앞뒤 단어로 이동"),
+                    ("↩", "새 검색 시작"),
+                ])
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, minHeight: 30, maxHeight: .infinity)
+        .modifier(OverlayScrollerModifier())
+        .contentMargins(.top, 12, for: .scrollContent)
+        .background(Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14))
+        // 업데이트 줄이 버튼↔텍스트로 바뀌면 눌린 버튼이 사라지면서 스크롤이 튄다.
+        // 결과는 맨 위에 나오므로 상태가 바뀔 때마다 위로 되돌린다.
+        .onChange(of: viewModel.settingsUpdateState) { _, _ in
+            proxy.scrollTo("settingsTop", anchor: .top)
+        }
+        }
+    }
+
+    /// 제목 + (보기, 설명) 줄들. 보기 칸을 고정 폭으로 잡아 설명 왼쪽을 맞춘다.
+    private func settingsSection(_ title: String, _ rows: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.black.opacity(0.4))
+
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: 8) {
+                    Text(row.0)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(textColor)
+                        .frame(width: 68, alignment: .leading)
+                    Text(row.1)
+                        .font(.system(size: 12))
+                        .foregroundColor(.black.opacity(0.4))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    /// 업데이트 확인 줄 — 확인 전에는 버튼, 확인 뒤에는 결과. 새 버전이 있으면 그 자리에서 설치.
+    @ViewBuilder
+    private var updateRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("업데이트")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.black.opacity(0.4))
+
+            // 버튼과 텍스트의 높이가 달라 서로 바뀔 때 아래 목록이 밀린다 — 한 높이로 고정.
+            Group {
+                switch viewModel.settingsUpdateState {
+                case .idle:
+                    settingsButton("Check for Update") {
+                        viewModel.checkForUpdateFromSettings()
+                    }
+                case .checking:
+                    settingsStatusText("확인 중…")
+                case .upToDate(let current):
+                    settingsStatusText("최신 버전입니다 (v \(current))")
+                case .available(let latest):
+                    settingsButton(viewModel.isUpdating
+                                   ? (viewModel.updateStatusText.isEmpty ? "Updating…" : viewModel.updateStatusText)
+                                   : "Update to v \(latest)") {
+                        viewModel.startUpdate()
+                    }
+                    .disabled(viewModel.isUpdating)
+                case .failed:
+                    settingsButton("확인하지 못했습니다. 다시 시도") {
+                        viewModel.checkForUpdateFromSettings()
+                    }
+                }
+            }
+            .frame(height: 30, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func settingsStatusText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13))
+            .foregroundColor(textColor)
+    }
+
+    /// 기존 업데이트 안내 버튼과 같은 생김새 (좌측 정렬로만 바꿈)
+    private func settingsButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(textColor)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Color.white.opacity(0.14))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 훈/음 영역 (가변 높이, 항상 표시)
@@ -856,7 +1017,13 @@ struct ContentView: View {
     private var inputArea: some View {
         ZStack(alignment: .trailing) {
             HStack {
-                if viewModel.isEditing {
+                if viewModel.isShowingSettings {
+                    // 설정 중에는 입력 비활성 — TextField 자체를 걷어내 포커스가 잡히지 않게 한다
+                    Text(UpdateCheck.appVersion.isEmpty ? "" : "v \(UpdateCheck.appVersion)")
+                        .font(.system(size: 16, weight: .light))
+                        .foregroundColor(textColor.opacity(0.55))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else if viewModel.isEditing {
                     TextField("", text: $viewModel.inputText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 16, weight: .medium))
@@ -876,14 +1043,17 @@ struct ContentView: View {
             .padding(.trailing, 52)
 
             Button(action: {
-                if viewModel.isEditing {
+                if viewModel.isShowingSettings {
+                    viewModel.closeSettings()
+                    refocusInputIfNeeded()
+                } else if viewModel.isEditing {
                     viewModel.performSearch()
                 } else {
                     viewModel.resetToEditing()
                     isInputFocused = true
                 }
             }) {
-                Image(viewModel.isEditing ? "vbtn" : "xbtn")
+                Image(viewModel.isEditing && !viewModel.isShowingSettings ? "vbtn" : "xbtn")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 36, height: 36)
@@ -938,6 +1108,48 @@ class HanjaViewModel: ObservableObject {
     /// 설치 후 재실행되었을 때만 true (설치 헬퍼가 -updatedTo 인자로 알림)
     @Published var justUpdated: Bool = false
     @Published var updatedToVersion: String = ""
+
+    // MARK: 설정 모드
+
+    /// 설정 화면 표시 여부. 검색 상태(isEditing/searchResult)는 그대로 두고 위에 겹치는
+    /// 모드라서, 빠져나오면 보고 있던 화면이 그대로 돌아온다.
+    @Published var isShowingSettings: Bool = false
+
+    /// 설정 안 "Check for Update" 줄의 상태
+    enum SettingsUpdateState: Equatable {
+        case idle, checking, upToDate(String), available(String), failed
+    }
+    @Published var settingsUpdateState: SettingsUpdateState = .idle
+
+    func toggleSettings() {
+        isShowingSettings.toggle()
+        settingsUpdateState = .idle
+    }
+
+    func closeSettings() {
+        isShowingSettings = false
+        settingsUpdateState = .idle
+    }
+
+    /// 설정에서 누르는 수동 확인 — 실행 시 1회 제한(didCheckUpdate)과 무관하게 매번 조회한다.
+    func checkForUpdateFromSettings() {
+        guard settingsUpdateState != .checking, !isUpdating else { return }
+        settingsUpdateState = .checking
+        Task {
+            switch await UpdateCheck.fetchStatus() {
+            case .available(let latest, _, let dmgURL):
+                latestVersion = latest
+                updateDMGURL = dmgURL
+                updateAvailable = true
+                settingsUpdateState = .available(latest)
+            case .upToDate(let current):
+                updateAvailable = false
+                settingsUpdateState = .upToDate(current)
+            case .failed:
+                settingsUpdateState = .failed
+            }
+        }
+    }
 
     private var keyMonitor: Any?
     private var resetAction: (() -> Void)?
@@ -1010,7 +1222,8 @@ class HanjaViewModel: ObservableObject {
         guard keyMonitor == nil else { return }
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self = self, !self.isEditing else { return event }
+            // 설정 중에는 방향키·엔터가 뒤에 가려진 검색 결과를 건드리지 않게 흘려보낸다
+            guard let self = self, !self.isEditing, !self.isShowingSettings else { return event }
 
             switch event.keyCode {
             case 123: // 왼쪽
