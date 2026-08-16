@@ -675,12 +675,17 @@ struct ContentView: View {
         }
     }
 
+    /// 설정 본문의 섹션 제목 — 업데이트 줄과 각 섹션이 같이 움직이도록 한 곳에서만 정의한다.
+    private func settingsTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .bold))
+            .foregroundColor(.black.opacity(0.4))
+    }
+
     /// 제목 + (보기, 설명) 줄들. 보기 칸을 고정 폭으로 잡아 설명 왼쪽을 맞춘다.
     private func settingsSection(_ title: String, _ rows: [(String, String)]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.black.opacity(0.4))
+            settingsTitle(title)
 
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(alignment: .top, spacing: 8) {
@@ -702,9 +707,7 @@ struct ContentView: View {
     @ViewBuilder
     private var updateRow: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("업데이트")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.black.opacity(0.4))
+            settingsTitle("업데이트")
 
             // 버튼과 텍스트의 높이가 달라 서로 바뀔 때 아래 목록이 밀린다 — 한 높이로 고정.
             Group {
