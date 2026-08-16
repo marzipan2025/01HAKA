@@ -82,6 +82,29 @@ extension Color {
     static let hanjaText = Color(red: 0x86/255, green: 0x98/255, blue: 0xB5/255).opacity(0.6)
     /// 비리퀴드(불투명/포커스아웃) 상태의 본문 텍스트 색 — 위 색보다 30% 어둡게 (#647185 @ 0.8)
     static let hanjaTextDim = Color(red: 0x64/255, green: 0x71/255, blue: 0x85/255).opacity(0.8)
+    /// 다크 모드 본문 텍스트 — 같은 푸른 계열을 어두운 바탕에서 읽히도록 올린 값 (#A8BAD6 @ 0.85)
+    static let hanjaTextOnDark = Color(red: 0xA8/255, green: 0xBA/255, blue: 0xD6/255).opacity(0.85)
+}
+
+// MARK: - 겉모습 (⌘G 로 순환)
+
+/// 사용자가 고른 모드. ⌘G 가 유리 → 라이트 → 다크 → 유리 로 돌린다.
+enum AppearanceMode: String, CaseIterable {
+    case glass, light, dark
+
+    var next: AppearanceMode {
+        switch self {
+        case .glass: return .light
+        case .light: return .dark
+        case .dark:  return .glass
+        }
+    }
+}
+
+/// 실제로 그려지는 겉모습. 유리는 macOS 26 이상이면서 창이 활성일 때만 성립하고,
+/// 그 외에는 라이트로 내려간다 — 라이트/다크는 창 상태와 무관하게 그대로 유지된다.
+enum Appearance {
+    case glass, light, dark
 }
 
 // MARK: - Legacy background (pre-macOS 26 fallback)
@@ -116,40 +139,46 @@ struct VisualEffectBackground: NSViewRepresentable {
 struct GlassBackgroundModifier: ViewModifier {
     private let cornerRadius: CGFloat = 26
 
-    var useGlass: Bool
-    /// 창이 활성 상태인지. 비활성이면 리퀴드 대신 불투명(legacy) 배경으로 내림
-    var isWindowActive: Bool = true
+    var appearance: Appearance
 
+    /// 불투명 배경 — 블러 위에 색면을 덮는다. 색면만 모드별로 갈아끼운다.
     @ViewBuilder
-    private func legacyBackground(_ content: Content) -> some View {
+    private func solidBackground(_ content: Content, tint: Color) -> some View {
         content
             .background(
                 ZStack {
                     VisualEffectBackground(material: .fullScreenUI, blendingMode: .behindWindow, alpha: 1.0)
-                    Color(red: 0xF5/255, green: 0xF4/255, blue: 0xFF/255).opacity(0.85)
+                    tint
                 }
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *), useGlass, isWindowActive {
-            content
-                .background(
-                    // 색면 없이 유리 밑 블러 레이어만으로 가독성 확보
-                    VisualEffectBackground(material: .fullScreenUI, blendingMode: .behindWindow, alpha: 0.35)
-                )
-                .glassEffect(.clear, in: .rect(cornerRadius: 0))
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        } else {
-            legacyBackground(content)
+        switch appearance {
+        case .glass:
+            if #available(macOS 26.0, *) {
+                content
+                    .background(
+                        // 색면 없이 유리 밑 블러 레이어만으로 가독성 확보
+                        VisualEffectBackground(material: .fullScreenUI, blendingMode: .behindWindow, alpha: 0.35)
+                    )
+                    .glassEffect(.clear, in: .rect(cornerRadius: 0))
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            } else {
+                solidBackground(content, tint: Color(red: 0xF5/255, green: 0xF4/255, blue: 0xFF/255).opacity(0.85))
+            }
+        case .light:
+            solidBackground(content, tint: Color(red: 0xF5/255, green: 0xF4/255, blue: 0xFF/255).opacity(0.85))
+        case .dark:
+            solidBackground(content, tint: Color(red: 0x1A/255, green: 0x1D/255, blue: 0x23/255).opacity(0.86))
         }
     }
 }
 
 struct ContentView: View {
     @StateObject private var viewModel = HanjaViewModel()
-    @AppStorage("useGlassEffect") private var useGlassEffect: Bool = true
+    @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .glass
     @FocusState private var isInputFocused: Bool
     @State private var isTrafficLightHovered = false
     @State private var isWindowActive = true
@@ -159,17 +188,36 @@ struct ContentView: View {
     enum ScrollFocus { case none, top, middle }
     @State private var scrollFocus: ScrollFocus = .none
 
-    /// 리퀴드 글래스가 실제로 보이는 상태 (배경 모디파이어 조건과 일치)
-    private var isLiquidActive: Bool {
-        if #available(macOS 26.0, *) {
-            return useGlassEffect && isWindowActive
+    /// 실제로 그려지는 겉모습 (배경 모디파이어 조건과 일치).
+    /// 유리는 창이 비활성이면 라이트로 내려가지만, 라이트/다크는 그대로 유지된다.
+    private var appearance: Appearance {
+        switch appearanceMode {
+        case .glass:
+            if #available(macOS 26.0, *), isWindowActive { return .glass }
+            return .light
+        case .light: return .light
+        case .dark:  return .dark
         }
-        return false
     }
 
-    /// 본문 텍스트 색 — 비리퀴드(불투명/포커스아웃)일 때 20% 어둡게
+    /// 본문 텍스트 색 — 불투명(포커스아웃 포함)일 때 20% 어둡게, 다크에서는 밝게
     private var textColor: Color {
-        isLiquidActive ? Color.hanjaText : Color.hanjaTextDim
+        switch appearance {
+        case .glass: return Color.hanjaText
+        case .light: return Color.hanjaTextDim
+        case .dark:  return Color.hanjaTextOnDark
+        }
+    }
+
+    /// 뜻풀이·설명처럼 한 단계 죽인 텍스트. 밝은 바탕에선 검정, 어두운 바탕에선 흰색 계열.
+    private func secondaryText(_ opacity: Double = 0.4) -> Color {
+        appearance == .dark ? Color.white.opacity(opacity * 0.95) : Color.black.opacity(opacity)
+    }
+
+    /// 가장 진하게 튀어야 하는 강조색 (많이 찾은 글자, 최상위 급수, 켜진 핀).
+    /// 밝은 바탕의 검정에 대응하는 어두운 바탕의 흰색.
+    private var emphasisColor: Color {
+        appearance == .dark ? .white : .black
     }
 
     var body: some View {
@@ -211,7 +259,7 @@ struct ContentView: View {
         .padding(0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minWidth: 310, minHeight: 270)
-        .modifier(GlassBackgroundModifier(useGlass: useGlassEffect, isWindowActive: isWindowActive))
+        .modifier(GlassBackgroundModifier(appearance: appearance))
         .ignoresSafeArea()
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             isWindowActive = true
@@ -229,7 +277,7 @@ struct ContentView: View {
             setWindowLevel(viewModel.isAlwaysOnTop ? .floating : .normal)
         }
         .onReceive(NotificationCenter.default.publisher(for: .hanjaToggleGlassEffect)) { _ in
-            useGlassEffect.toggle()
+            appearanceMode = appearanceMode.next
             refocusInputIfNeeded()
         }
         // ⌘, 는 토글 — 설정에 들어간 단축키로 그대로 나올 수 있다.
@@ -355,8 +403,9 @@ struct ContentView: View {
                 .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
                 // 핀 됨: #181818 @0.8 / 안 됨: 글자색(#8FA1BE)에서 0.1 더 투명한 @0.5
+                // 핀 됨: 강조색 @0.8 (다크에선 흰색) / 안 됨: 글자색(#8FA1BE)에서 0.1 더 투명한 @0.5
                 .foregroundColor(viewModel.isAlwaysOnTop
-                    ? Color(red: 0x18/255, green: 0x18/255, blue: 0x18/255).opacity(0.8)
+                    ? emphasisColor.opacity(0.8)
                     : Color(red: 0x8F/255, green: 0xA1/255, blue: 0xBE/255).opacity(0.5))
         }
         .buttonStyle(.plain)
@@ -437,7 +486,7 @@ struct ContentView: View {
                 hanjaTextView(result: result)
             } else if viewModel.hasSearched {
                 Text(viewModel.failureMessage)
-                    .foregroundColor(viewModel.isEraseMessage ? .black.opacity(0.3) : textColor)
+                    .foregroundColor(viewModel.isEraseMessage ? secondaryText(0.3) : textColor)
                     .font(.system(size: 56, weight: .ultraLight))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 14)
@@ -481,7 +530,7 @@ struct ContentView: View {
             let weight = weights[min(tier, weights.count - 1)]
             let color: Color = {
                 if !isActive { return textColor }
-                if tier >= 5 { return .black }
+                if tier >= 5 { return emphasisColor }
                 else if tier >= 4 { return Color(red: 1, green: 1, blue: 0) }
                 else if tier >= 3 { return Color(red: 1, green: 0xFC/255, blue: 0xCB/255) }
                 return textColor
@@ -653,7 +702,7 @@ struct ContentView: View {
                     ("⌘ O", "검색 기록 폴더 열기"),
                     ("⌘ E", "검색 기록 지우기"),
                     ("⌘ T", "창을 항상 위에"),
-                    ("⌘ G", "유리 효과 켜고 끄기"),
+                    ("⌘ G", "겉모습 순환 — 유리 → 라이트 → 다크"),
                     ("← →", "결과에서 앞뒤 단어로 이동"),
                     ("↩", "새 검색 시작"),
                 ])
@@ -678,8 +727,8 @@ struct ContentView: View {
     /// 설정 본문의 섹션 제목 — 업데이트 줄과 각 섹션이 같이 움직이도록 한 곳에서만 정의한다.
     private func settingsTitle(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .bold))
-            .foregroundColor(.black.opacity(0.4))
+            .font(.system(size: 14, weight: .heavy))
+            .foregroundColor(secondaryText())
     }
 
     /// 제목 + (보기, 설명) 줄들. 보기 칸을 고정 폭으로 잡아 설명 왼쪽을 맞춘다.
@@ -695,7 +744,7 @@ struct ContentView: View {
                         .frame(width: 68, alignment: .leading)
                     Text(row.1)
                         .font(.system(size: 12))
-                        .foregroundColor(.black.opacity(0.4))
+                        .foregroundColor(secondaryText())
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -781,7 +830,7 @@ struct ContentView: View {
             return textColor
         }
         switch grade {
-        case 0: return .black
+        case 0: return emphasisColor
         case 1: return Color(red: 0.16, green: 0.60, blue: 0.82)
         case 2: return .yellow
         case 3: return Color(red: 0.7, green: 0.85, blue: 0.5)
@@ -952,7 +1001,7 @@ struct ContentView: View {
                     if needsTruncation {
                         Text(isExpanded ? "−" : "+")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.black.opacity(0.4))
+                            .foregroundColor(secondaryText())
                             .frame(width: 14, alignment: .center)
                             .padding(.top, -1)
                     } else {
@@ -960,7 +1009,7 @@ struct ContentView: View {
                     }
                     Text(fullText)
                         .font(.system(size: 12))
-                        .foregroundColor(.black.opacity(0.4))
+                        .foregroundColor(secondaryText())
                         .lineLimit(isExpanded ? nil : 1)
                         .truncationMode(.tail)
                         .fixedSize(horizontal: false, vertical: true)

@@ -42,7 +42,7 @@ struct HanjaWidgetApp: App {
                 }
                 .keyboardShortcut("t", modifiers: .command)
 
-                Button("Toggle Glass Effect") {
+                Button("Cycle Appearance") {
                     NotificationCenter.default.post(name: .hanjaToggleGlassEffect, object: nil)
                 }
                 .keyboardShortcut("g", modifiers: .command)
