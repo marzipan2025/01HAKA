@@ -1,1 +1,9 @@
 claude_kanji/build/
+
+# Build artifacts — the dmg is a release asset, never a tracked file.
+# `dmg/make_dmg.sh` builds it into claude_kanji/dist/ and uploads it to the
+# GitHub release; the in-app updater fetches it from there, not from the repo.
+claude_kanji/dist/
+*.dmg
+
+.DS_Store
