@@ -729,13 +729,14 @@ struct ContentView: View {
                     ("(어미)", "괄호 안에 훈만 넣으면 훈에 그 말이 들어간 한자를 모두 찾습니다."),
                 ])
 
-                settingsSection("읽는 법", [
-                    ("❶ ⑧", "훈 앞의 원기호는 배정 급수입니다. ● 는 특급, 숫자가 클수록 쉬운 급수."),
-                    ("색", "3급 이상은 색으로도 구분합니다 — 특급 검정, 1급 파랑, 2급 노랑, 3급 연두. 4급부터는 본문과 같은 색."),
-                    ("●  1  2", "같은 말을 여러 한자로 쓸 때 ● 가 첫 번째, 숫자가 그 다음 표기입니다."),
-                    ("+  −", "단어 뜻을 펼치고 접습니다."),
-                    ("굵기", "자주 찾은 글자일수록 굵고 진해집니다. 열 번마다 한 단계씩."),
-                ])
+                VStack(alignment: .leading, spacing: 6) {
+                    settingsTitle("읽는 법")
+                    settingsRow("❶ ⑧", "훈 앞의 원기호는 배정 급수입니다. ● 는 특급, 숫자가 클수록 쉬운 급수.")
+                    gradeLegendRow
+                    settingsRow("●  1  2", "같은 말을 여러 한자로 쓸 때 ● 가 첫 번째, 숫자가 그 다음 표기입니다.")
+                    settingsRow("+  −", "단어 뜻을 펼치고 접습니다.")
+                    settingsRow("굵기", "자주 찾은 글자일수록 굵고 진해집니다. 열 번마다 한 단계씩.")
+                }
 
                 settingsSection("단축키", [
                     ("⌘ ,", "설정 열고 닫기"),
@@ -778,19 +779,59 @@ struct ContentView: View {
             settingsTitle(title)
 
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(alignment: .top, spacing: 8) {
-                    Text(row.0)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(textColor)
-                        .frame(width: 68, alignment: .leading)
-                    Text(row.1)
-                        .font(.system(size: 12))
-                        .foregroundColor(secondaryText())
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                settingsRow(row.0, row.1)
             }
         }
+    }
+
+    /// 한 줄: 왼쪽 보기 칸(고정 폭) + 오른쪽 설명
+    private func settingsRow(_ label: String, _ description: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(textColor)
+                .frame(width: 68, alignment: .leading)
+            Text(description)
+                .font(.system(size: 12))
+                .foregroundColor(secondaryText())
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// 급수 색 안내 — 말로 풀지 않고 원기호를 실제 색 그대로 늘어놓는다.
+    /// 기호도 색도 본문 렌더링과 같은 함수에서 가져오므로 실제 화면과 어긋날 수 없다.
+    private var gradeLegendRow: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("색")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(textColor)
+                .frame(width: 68, alignment: .leading)
+
+            gradeLegendText
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var gradeLegendText: Text {
+        // 색이 갈리는 구간(특급~3급)만 낱개로 보이고, 4급부터는 한 덩어리로 묶는다
+        let entries: [(grade: Int, name: String)] = [
+            (0, "특급"), (1, "1급"), (2, "2급"), (3, "3급"), (4, "4급부터"),
+        ]
+        var out = Text("")
+        for (index, entry) in entries.enumerated() {
+            if index > 0 {
+                out = out + Text("   ").font(.system(size: 12))
+            }
+            out = out + Text(gradeSymbol(grade: entry.grade))
+                .font(.system(size: 12))
+                .foregroundColor(gradeColor(grade: entry.grade))
+            out = out + Text(" \(entry.name)")
+                .font(.system(size: 12))
+                .foregroundColor(secondaryText())
+        }
+        return out
     }
 
     /// 업데이트 확인 줄 — 확인 전에는 버튼, 확인 뒤에는 결과. 새 버전이 있으면 그 자리에서 설치.
@@ -858,25 +899,32 @@ struct ContentView: View {
 
     @State private var expandedDefinitions: Set<String> = []
 
-    /// 급수 원기호 반환
-    private func gradeSymbol(for char: Character) -> String {
-        guard let grade = hanjaGradeMap[char] else { return "●" }
+    /// 급수 원기호. 설정의 색 안내도 이 함수를 거치므로 표기가 갈라지지 않는다.
+    private func gradeSymbol(grade: Int) -> String {
         let symbols = ["●", "❶", "❷", "❸", "❹", "❺", "⑥", "⑦", "⑧"]
-        return symbols[min(grade, symbols.count - 1)]
+        return symbols[min(max(grade, 0), symbols.count - 1)]
     }
 
-    /// 급수별 색상 반환
-    private func gradeColor(for char: Character) -> Color {
-        guard let grade = hanjaGradeMap[char] else {
-            return textColor
-        }
+    /// 급수별 색상. 여기가 유일한 색 정의 — 설정의 색 안내가 같은 값을 그대로 읽어가므로
+    /// 색을 바꿔도 안내가 따로 놀지 않는다.
+    private func gradeColor(grade: Int) -> Color {
         switch grade {
         case 0: return emphasisColor
         case 1: return Color(red: 0.16, green: 0.60, blue: 0.82)
         case 2: return .yellow
-        case 3: return Color(red: 0.7, green: 0.85, blue: 0.5)
+        case 3: return Color(red: 0x50/255, green: 0x7D/255, blue: 0x2A/255)  // sap green
         default: return textColor
         }
+    }
+
+    private func gradeSymbol(for char: Character) -> String {
+        guard let grade = hanjaGradeMap[char] else { return "●" }
+        return gradeSymbol(grade: grade)
+    }
+
+    private func gradeColor(for char: Character) -> Color {
+        guard let grade = hanjaGradeMap[char] else { return textColor }
+        return gradeColor(grade: grade)
     }
 
     private var hunEumArea: some View {
