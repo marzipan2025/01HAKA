@@ -351,7 +351,7 @@ struct ContentView: View {
     }
 
     private func setWindowLevel(_ level: NSWindow.Level) {
-        NSApplication.shared.windows.first?.level = level
+        windowForActions()?.level = level
     }
 
     private var windowChromeArea: some View {
@@ -444,8 +444,19 @@ struct ContentView: View {
         .contentShape(Rectangle())
     }
 
+    /// 창 조작(닫기·최소화·확대·항상 위)의 대상 창.
+    ///
+    /// SwiftUI 는 콘텐츠 창 말고도 보조 창(TUINSWindow, SPRoundedWindow 등)을 들고 있어서
+    /// `windows.first` 로 집으면 엉뚱한 창이 걸린다 — Always on Top 이 실제로 그렇게 새서
+    /// 본 창은 그대로였다. 보조 창들은 화면에 없으므로 isVisible 로 걸러진다.
+    ///
+    /// canBecomeKey 로는 거르면 안 된다. 이 앱의 콘텐츠 창은 borderless 라 키 윈도우로
+    /// 동작하면서도(isKeyWindow == true) canBecomeKey 는 false 를 돌려준다.
     private func windowForActions() -> NSWindow? {
-        NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first(where: { $0.isVisible })
+        if let key = NSApplication.shared.keyWindow, !(key is NSPanel) {
+            return key
+        }
+        return NSApplication.shared.windows.first { $0.isVisible && !($0 is NSPanel) }
     }
 
     private func refocusInputIfNeeded() {
