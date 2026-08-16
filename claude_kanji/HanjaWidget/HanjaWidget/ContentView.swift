@@ -209,6 +209,18 @@ struct ContentView: View {
         }
     }
 
+    /// 중간 패널(훈/음·설정 본문) 바탕. 두 영역이 같이 움직이도록 한 곳에서만 정의한다.
+    /// 라이트에서만 5% 더 눌러준다 — 유리는 배경이 비쳐 이미 구분되고, 다크는 대비가 충분하다.
+    @ViewBuilder
+    private var panelBackground: some View {
+        ZStack {
+            Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14)
+            if appearance == .light {
+                Color.black.opacity(0.05)
+            }
+        }
+    }
+
     /// 뜻풀이·설명처럼 한 단계 죽인 텍스트. 밝은 바탕에선 검정, 어두운 바탕에선 흰색 계열.
     private func secondaryText(_ opacity: Double = 0.4) -> Color {
         appearance == .dark ? Color.white.opacity(opacity * 0.95) : Color.black.opacity(opacity)
@@ -768,7 +780,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, minHeight: 30, maxHeight: .infinity)
         .modifier(OverlayScrollerModifier())
         .contentMargins(.top, 12, for: .scrollContent)
-        .background(Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14))
+        .background(panelBackground)
         // 업데이트 줄이 버튼↔텍스트로 바뀌면 눌린 버튼이 사라지면서 스크롤이 튄다.
         // 결과는 맨 위에 나오므로 상태가 바뀔 때마다 위로 되돌린다.
         .onChange(of: viewModel.settingsUpdateState) { _, _ in
@@ -960,7 +972,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, minHeight: 30, maxHeight: .infinity)
             .modifier(OverlayScrollerModifier())
             .contentMargins(.top, 12, for: .scrollContent)
-            .background(Color(red: 0xBA/255, green: 0xD0/255, blue: 0xE2/255).opacity(0.14))
+            .background(panelBackground)
             // 상단 → 중간: 활성 단어가 (상단 스크롤/키보드로) 바뀌면 그 단어 섹션으로 스크롤.
             // 단, 지금 사용자가 중간을 스크롤 중이면(중간이 유발한 변경) 중간을 건드리지 않는다.
             .onChange(of: viewModel.activeWordIndex) { _, idx in
