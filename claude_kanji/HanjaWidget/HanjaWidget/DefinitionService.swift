@@ -34,7 +34,10 @@ class DefinitionService {
 
         for hanja in hanjaVariants {
             let key = "\(korean):\(hanja)"
-            if let cached = cache[key] {
+            // 앱 안에 든 것이 먼저다. 그물에 걸리지 않는 것만 물어보러 나간다.
+            if let local = MeaningStore.shared.meaning(korean: korean, hanja: hanja) {
+                result[hanja] = [local]
+            } else if let cached = cache[key] {
                 result[hanja] = cached
             } else {
                 uncached.append(hanja)

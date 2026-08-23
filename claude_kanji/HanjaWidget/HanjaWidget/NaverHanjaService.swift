@@ -13,6 +13,10 @@ class HanjaService {
     /// 음(eum) → [(한자, 원본 설명)] 역방향 조회 (e.g., "모" → [(母, "어미 모"), (毛, "털 모"), ...])
     private var eumToChars: [String: [(char: Character, rawDescription: String)]] = [:]
 
+    /// (음 + 한자) → 그 음으로 읽을 때의 훈. 數 는 '수' 로 헤아릴·몇, '삭' 으로 자주다.
+    /// 글자마다 훈음을 하나만 들고 있으면 數學 이 '삭학' 으로 선다.
+    private var hunByReading: [String: String] = [:]
+
     /// 사전에 존재하는 모든 단어 길이 (최적화용)
     private var maxWordLength: Int = 6
 
@@ -56,9 +60,11 @@ class HanjaService {
         }
 
         let variants = candidates.map { String($0.char) }
+        // 음을 알고 찾았으니 훈도 그 음의 것으로
         let characters = candidates.compactMap { candidate -> HanjaChar? in
-            guard let info = charToHunEum[candidate.char] else { return nil }
-            return HanjaChar(character: candidate.char, hun: info.hun, eum: info.eum)
+            let hun = hunByReading["\(eum)\(candidate.char)"] ?? charToHunEum[candidate.char]?.hun
+            guard let hun else { return nil }
+            return HanjaChar(character: candidate.char, hun: hun, eum: eum)
         }
 
         let word = HanjaWord(
@@ -170,9 +176,14 @@ class HanjaService {
                 let description = parts.count >= 3 ? parts[2] : ""
                 if !description.isEmpty {
                     let hanjaChar = hanja.first!
+                    let (hun, eum) = parseHunEum(description: description, eum: korean)
                     if charToHunEum[hanjaChar] == nil {
-                        let (hun, eum) = parseHunEum(description: description, eum: korean)
                         charToHunEum[hanjaChar] = (hun: hun, eum: eum)
+                    }
+                    // 음마다 따로 적어 둔다 — 낱말이 음을 알려 주면 그 음의 훈을 쓴다
+                    let reading = "\(korean)\(hanjaChar)"
+                    if hunByReading[reading] == nil {
+                        hunByReading[reading] = hun
                     }
                     // 역방향 조회용
                     if eumToChars[korean] == nil {
@@ -232,16 +243,26 @@ class HanjaService {
                 guard substring.allSatisfy({ $0.isHangul }) else { continue }
 
                 if let variants = wordToHanja[substring] {
-                    // 모든 variant의 고유 한자 글자에 대해 훈/음 조회
-                    var allCharsSet: Set<Character> = []
-                    var allCharsOrdered: [Character] = []
+                    // 음은 낱말이 알려 준다. 낱말과 한자의 글자 수가 맞으면 자리끼리
+                    // 짝을 지어 그 자리의 한글을 음으로 쓴다 — 數學 의 數 는 '삭' 이
+                    // 아니라 '수' 이고, 龜裂 의 龜 는 '구' 가 아니라 '균' 이다.
+                    let syllables = Array(substring)
+                    var seen: Set<Character> = []
+                    var characters: [HanjaChar] = []
                     for v in variants {
-                        for c in v where c.isHanja && !allCharsSet.contains(c) {
-                            allCharsSet.insert(c)
-                            allCharsOrdered.append(c)
+                        let letters = Array(v)
+                        let paired = letters.count == syllables.count
+                        for (i, c) in letters.enumerated() where c.isHanja && !seen.contains(c) {
+                            seen.insert(c)
+                            if paired {
+                                let eum = String(syllables[i])
+                                let hun = hunByReading["\(eum)\(c)"] ?? charToHunEum[c]?.hun ?? ""
+                                characters.append(HanjaChar(character: c, hun: hun, eum: eum))
+                            } else if let known = lookupCharacter(c) {
+                                characters.append(known)
+                            }
                         }
                     }
-                    let characters = allCharsOrdered.compactMap { lookupCharacter($0) }
 
                     let word = HanjaWord(
                         korean: substring,

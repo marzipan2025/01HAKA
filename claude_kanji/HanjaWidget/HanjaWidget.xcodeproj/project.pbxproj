@@ -15,9 +15,11 @@
 		A10006 /* succeed.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A20007 /* succeed.mp3 */; };
 		A10007 /* fail.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A20008 /* fail.mp3 */; };
 		A10008 /* hanja.txt in Resources */ = {isa = PBXBuildFile; fileRef = A20009 /* hanja.txt */; };
+		A10033 /* meanings.txt in Resources */ = {isa = PBXBuildFile; fileRef = A20034 /* meanings.txt */; };
 		A10009 /* THIRD_PARTY_LICENSES.txt in Resources */ = {isa = PBXBuildFile; fileRef = A20010 /* THIRD_PARTY_LICENSES.txt */; };
 		A10012 /* hanja_grades.txt in Resources */ = {isa = PBXBuildFile; fileRef = A20013 /* hanja_grades.txt */; };
 		A10010 /* DefinitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20011 /* DefinitionService.swift */; };
+		A10031 /* MeaningStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20032 /* MeaningStore.swift */; };
 		A10011 /* HanjaGrades.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20012 /* HanjaGrades.swift */; };
 		A10020 /* UpdateCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20020 /* UpdateCheck.swift */; };
 /* End PBXBuildFile section */
@@ -32,8 +34,10 @@
 		A20007 /* succeed.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = succeed.mp3; sourceTree = "<group>"; };
 		A20008 /* fail.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = fail.mp3; sourceTree = "<group>"; };
 		A20009 /* hanja.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = hanja.txt; sourceTree = "<group>"; };
+		A20034 /* meanings.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = meanings.txt; sourceTree = "<group>"; };
 		A20010 /* THIRD_PARTY_LICENSES.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = THIRD_PARTY_LICENSES.txt; sourceTree = "<group>"; };
 		A20011 /* DefinitionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefinitionService.swift; sourceTree = "<group>"; };
+		A20032 /* MeaningStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeaningStore.swift; sourceTree = "<group>"; };
 		A20012 /* HanjaGrades.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HanjaGrades.swift; sourceTree = "<group>"; };
 		A20013 /* hanja_grades.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = hanja_grades.txt; sourceTree = "<group>"; };
 		A20020 /* UpdateCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheck.swift; sourceTree = "<group>"; };
@@ -71,8 +75,10 @@ A30001 /* HanjaWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapp
 				A20007 /* succeed.mp3 */,
 				A20008 /* fail.mp3 */,
 				A20009 /* hanja.txt */,
+				A20034 /* meanings.txt */,
 				A20010 /* THIRD_PARTY_LICENSES.txt */,
 				A20011 /* DefinitionService.swift */,
+				A20032 /* MeaningStore.swift */,
 				A20012 /* HanjaGrades.swift */,
 				A20013 /* hanja_grades.txt */,
 				A20020 /* UpdateCheck.swift */,
@@ -151,6 +157,7 @@ A30001 /* HanjaWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapp
 				A10006 /* succeed.mp3 in Resources */,
 				A10007 /* fail.mp3 in Resources */,
 				A10008 /* hanja.txt in Resources */,
+				A10033 /* meanings.txt in Resources */,
 				A10009 /* THIRD_PARTY_LICENSES.txt in Resources */,
 				A10012 /* hanja_grades.txt in Resources */,
 			);
@@ -168,6 +175,7 @@ A30001 /* HanjaWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapp
 				A10003 /* NaverHanjaService.swift in Sources */,
 				A10004 /* Models.swift in Sources */,
 				A10010 /* DefinitionService.swift in Sources */,
+				A10031 /* MeaningStore.swift in Sources */,
 				A10011 /* HanjaGrades.swift in Sources */,
 				A10020 /* UpdateCheck.swift in Sources */,
 			);
