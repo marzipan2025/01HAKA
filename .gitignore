@@ -7,3 +7,8 @@ claude_kanji/dist/
 *.dmg
 
 .DS_Store
+
+# 뿌리에 남는 DerivedData 와 Xcode 의 개인 설정. 소스가 아닌데도 남아 있으면
+# make_dmg.sh 의 게시 관문(working tree is dirty)에 걸린다.
+build/
+xcuserdata/
