@@ -27,18 +27,35 @@ class HanjaService {
     // MARK: - Public API
 
     func search(text: String) -> SearchResult {
-        // (훈 음) 패턴 감지
+        // 훈·음으로 글자를 집는 입력. 여는 표시 하나면 된다 — / 든 ( 든.
+        //
+        // 닫는 괄호까지 기다리게 하면 그것을 칠 때까지 화면이 죽는다. 이 검색은
+        // 글자마다 도는데 `(어미 모` 는 괄호 분기에 걸리지 못하고 평범한 한글
+        // 문장으로 떨어지기 때문이다. 닫는 괄호가 가르는 것도 없다 — 훈만인지
+        // 훈과 음인지는 안쪽의 띄어쓰기가 정한다.
+        //
+        // 26HAKC 와 같은 문법이다. 전각 괄호도 받아 준다.
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("(") && trimmed.hasSuffix(")") {
-            let inner = String(trimmed.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: "（", with: "(")
+            .replacingOccurrences(of: "）", with: ")")
+        var body: Substring?
+        if trimmed.hasPrefix("/") {
+            body = trimmed.dropFirst()
+        } else if trimmed.hasPrefix("(") {
+            var b = trimmed.dropFirst()
+            if b.hasSuffix(")") { b = b.dropLast() }     // 닫아 두었으면 그것도 받는다
+            body = b
+        }
+        if let body {
+            let inner = body.trimmingCharacters(in: .whitespaces)
             let parts = inner.components(separatedBy: " ").filter { !$0.isEmpty }
             if parts.count >= 2 {
-                // 공백 있음 → (훈 음) 검색
+                // 띄어쓰기 있음 → 훈 음 검색
                 let eum = parts.last!
                 let hun = parts.dropLast().joined(separator: " ")
                 return searchByHunEum(hun: hun, eum: eum, inputText: trimmed)
             } else if parts.count == 1 {
-                // 공백 없음 → 훈 substring 검색
+                // 띄어쓰기 없음 → 훈 substring 검색
                 return searchByHun(hun: parts[0], inputText: trimmed)
             }
         }
