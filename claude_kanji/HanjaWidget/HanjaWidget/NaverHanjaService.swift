@@ -17,6 +17,15 @@ class HanjaService {
     /// 글자마다 훈음을 하나만 들고 있으면 數學 이 '삭학' 으로 선다.
     private var hunByReading: [String: String] = [:]
 
+    /// (한글, 한자) 짝을 사전에 실린 차례대로. 한자로 되짚을 때 이 차례가 곧 순번이다.
+    private var entries: [(ko: String, hanja: String)] = []
+
+    /// 한자 글자 → 그 글자가 든 [entries] 자리. 첫 한자 검색 때 한 번만 짓는다.
+    private var hanjaIndex: [Character: [Int]] = [:]
+
+    /// 한자로 되짚을 때 세우는 낱말 수의 한도. 26HAKC 와 같은 값이다.
+    private let hanjaMax = 120
+
     /// 사전에 존재하는 모든 단어 길이 (최적화용)
     private var maxWordLength: Int = 6
 
@@ -63,6 +72,11 @@ class HanjaService {
         // 단일 한글 음절 → 해당 음가의 한자들 조회
         if trimmed.count == 1, let char = trimmed.first, char.isHangul {
             return searchByEum(eum: trimmed, inputText: trimmed)
+        }
+
+        // 한자를 그대로 넣으면 그 글자가 든 낱말을 모아 준다
+        if trimmed.contains(where: { $0.isHanja }) {
+            return searchByHanja(trimmed)
         }
 
         let (words, ranges) = findHanjaWords(in: text)
@@ -169,6 +183,88 @@ class HanjaService {
         return SearchResult(inputText: inputText, words: [word])
     }
 
+    // MARK: - Hanja Lookup (한자를 그대로 넣었을 때)
+
+    /// 낱말 하나에 딸린 글자들의 訓音.
+    ///
+    /// 음은 낱말이 알려 준다. 낱말과 한자의 글자 수가 맞으면 자리끼리 짝을 지어
+    /// 그 자리의 한글을 음으로 쓴다 — 數學 의 數 는 '삭' 이 아니라 '수' 이고,
+    /// 龜裂 의 龜 는 '구' 가 아니라 '균' 이다.
+    private func characters(of korean: String, variants: [String]) -> [HanjaChar] {
+        let syllables = Array(korean)
+        var seen: Set<Character> = []
+        var characters: [HanjaChar] = []
+        for v in variants {
+            let letters = Array(v)
+            let paired = letters.count == syllables.count
+            for (i, c) in letters.enumerated() where c.isHanja && !seen.contains(c) {
+                seen.insert(c)
+                if paired {
+                    let eum = String(syllables[i])
+                    let hun = hunByReading["\(eum)\(c)"] ?? charToHunEum[c]?.hun ?? ""
+                    characters.append(HanjaChar(character: c, hun: hun, eum: eum))
+                } else if let known = lookupCharacter(c) {
+                    characters.append(known)
+                }
+            }
+        }
+        return characters
+    }
+
+    /// 한자 → 그 글자가 든 낱말 자리. 30만 줄을 한 번 더 훑는 일이라 앱을 띄우는
+    /// 길목에서 하지 않고, 한자를 처음 넣었을 때 짓는다.
+    private func buildHanjaIndexIfNeeded() {
+        guard hanjaIndex.isEmpty else { return }
+        for (i, e) in entries.enumerated() {
+            var seen: Set<Character> = []
+            for c in e.hanja where c.isHanja && !seen.contains(c) {
+                seen.insert(c)
+                hanjaIndex[c, default: []].append(i)
+            }
+        }
+    }
+
+    /// 한자로 되짚기 — 그 한자가 든 낱말을 모아 준다. 26HAKC 의 규칙 그대로다.
+    ///
+    /// 한 글자만 넣으면 두 글자 낱말로 좁힌다. 한 글자가 든 낱말은 수천 개여서
+    /// 다 세우면 무엇을 보러 왔는지 알 수 없어진다. 여러 글자를 넣으면 그 이음이
+    /// 든 낱말을 찾는다. 걸리는 것이 없으면 글자마다 訓音만 돌려준다.
+    private func searchByHanja(_ text: String) -> SearchResult {
+        let han = String(text.filter { $0.isHanja })
+        guard let first = han.first else {
+            return SearchResult(inputText: text, words: [])
+        }
+        buildHanjaIndexIfNeeded()
+
+        let single = han.count == 1
+        var hits: [(idx: Int, len: Int)] = []
+        for i in hanjaIndex[first] ?? [] {
+            let e = entries[i]
+            guard e.hanja.contains(han) else { continue }
+            if single {
+                guard e.hanja.count == 2,
+                      !e.hanja.contains(where: { $0.isHangul }) else { continue }
+            }
+            hits.append((i, e.hanja.count))
+        }
+        // 짧은 낱말이 먼저, 같은 길이면 사전에 실린 차례대로
+        hits.sort { $0.len != $1.len ? $0.len < $1.len : $0.idx < $1.idx }
+
+        var words: [HanjaWord] = hits.prefix(hanjaMax).map { hit in
+            let e = entries[hit.idx]
+            return HanjaWord(korean: e.ko,
+                             hanjaVariants: [e.hanja],
+                             characters: characters(of: e.ko, variants: [e.hanja]))
+        }
+        if words.isEmpty {
+            // 낱말이 걸리지 않아도 글자는 읽어 준다
+            words = [HanjaWord(korean: han,
+                               hanjaVariants: [han],
+                               characters: han.compactMap { lookupCharacter($0) })]
+        }
+        return SearchResult(inputText: text, words: words)
+    }
+
     // MARK: - Dictionary Loading
 
     private func loadDictionary() {
@@ -221,6 +317,7 @@ class HanjaService {
             }
             if !wordToHanja[koreanOnly]!.contains(hanjaOnly) {
                 wordToHanja[koreanOnly]!.append(hanjaOnly)
+                entries.append((ko: koreanOnly, hanja: hanjaOnly))
             }
         }
 
@@ -260,26 +357,7 @@ class HanjaService {
                 guard substring.allSatisfy({ $0.isHangul }) else { continue }
 
                 if let variants = wordToHanja[substring] {
-                    // 음은 낱말이 알려 준다. 낱말과 한자의 글자 수가 맞으면 자리끼리
-                    // 짝을 지어 그 자리의 한글을 음으로 쓴다 — 數學 의 數 는 '삭' 이
-                    // 아니라 '수' 이고, 龜裂 의 龜 는 '구' 가 아니라 '균' 이다.
-                    let syllables = Array(substring)
-                    var seen: Set<Character> = []
-                    var characters: [HanjaChar] = []
-                    for v in variants {
-                        let letters = Array(v)
-                        let paired = letters.count == syllables.count
-                        for (i, c) in letters.enumerated() where c.isHanja && !seen.contains(c) {
-                            seen.insert(c)
-                            if paired {
-                                let eum = String(syllables[i])
-                                let hun = hunByReading["\(eum)\(c)"] ?? charToHunEum[c]?.hun ?? ""
-                                characters.append(HanjaChar(character: c, hun: hun, eum: eum))
-                            } else if let known = lookupCharacter(c) {
-                                characters.append(known)
-                            }
-                        }
-                    }
+                    let characters = self.characters(of: substring, variants: variants)
 
                     let word = HanjaWord(
                         korean: substring,
