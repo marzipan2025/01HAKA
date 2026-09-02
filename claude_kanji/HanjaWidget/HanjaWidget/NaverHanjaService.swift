@@ -262,7 +262,7 @@ class HanjaService {
                                hanjaVariants: [han],
                                characters: han.compactMap { lookupCharacter($0) })]
         }
-        return SearchResult(inputText: text, words: words)
+        return SearchResult(inputText: text, words: words, series: words.count > 1)
     }
 
     // MARK: - Dictionary Loading

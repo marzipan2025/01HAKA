@@ -25,4 +25,7 @@ struct SearchResult {
     let inputText: String     // 원래 입력 텍스트
     var words: [HanjaWord]    // 찾아진 한자 단어들
     var matchedRanges: [Range<String.Index>] = [] // 입력 텍스트 중 한자 단어로 매칭된 범위들
+    /// 한자로 찾아 한 벌로 줄지어 선 결과. 낱말 하나하나가 저마다 서지만 글 속에서
+    /// 따로 집어낸 낱말이 아니라 한 물음에 딸린 한 벌이므로, 번호를 붙여 세운다.
+    var series: Bool = false
 }

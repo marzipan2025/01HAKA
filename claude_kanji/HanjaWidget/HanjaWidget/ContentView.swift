@@ -583,7 +583,16 @@ struct ContentView: View {
     }
 
     /// 단일 변형(variant) 하나의 Text 생성 (한자 글자들 + 인디케이터)
-    private func buildVariantText(variant: String, vIdx: Int, isActive: Bool, hasMultipleVariants: Bool) -> Text {
+    /// 이 표기에 붙일 번호. nil 이면 붙이지 않는다. 0 은 ●, 그 위는 숫자다.
+    ///
+    /// 한자로 찾아 한 벌로 선 낱말은 낱말마다 1, 2, 3 … 으로 센다 — 26HAKC 와 같다.
+    /// 한 낱말을 여러 한자로 쓸 때는 첫 표기가 ● 이고 그다음이 1, 2 … 다.
+    private func slotMarker(wordIndex: Int, vIdx: Int, variantCount: Int) -> Int? {
+        if viewModel.searchResult?.series == true { return wordIndex + 1 }
+        return variantCount > 1 ? vIdx : nil
+    }
+
+    private func buildVariantText(variant: String, isActive: Bool, marker: Int?) -> Text {
         var text = Text("")
         for char in variant {
             let count = viewModel.previousSearchCount(for: char)
@@ -601,8 +610,8 @@ struct ContentView: View {
                 .font(.system(size: 56, weight: weight))
                 .foregroundColor(color)
         }
-        if hasMultipleVariants {
-            if vIdx == 0 {
+        if let marker {
+            if marker == 0 {
                 text = text + Text(" ●")
                     .font(.system(size: 6))
                     .foregroundColor(.red)
@@ -610,7 +619,7 @@ struct ContentView: View {
                 text = text + Text(" ")
                     .font(.system(size: 6))
             } else {
-                text = text + Text(" \(vIdx)")
+                text = text + Text(" \(marker)")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(textColor)
                     .baselineOffset(38)
@@ -621,7 +630,6 @@ struct ContentView: View {
 
     /// 비활성 단어 또는 단일 변형 단어 → 하나의 Text (텍스트 선택 전체 가능)
     private func buildSingleWordText(word: HanjaWord, wordIndex: Int) -> Text {
-        let hasMultipleVariants = word.hanjaVariants.count > 1
         let isActive = wordIndex == viewModel.activeWordIndex
         var text = Text("")
         for (vIdx, variant) in word.hanjaVariants.enumerated() {
@@ -631,7 +639,11 @@ struct ContentView: View {
                     .baselineOffset(-10)
                     .foregroundColor(isActive ? textColor : textColor)
             }
-            text = text + buildVariantText(variant: variant, vIdx: vIdx, isActive: isActive, hasMultipleVariants: hasMultipleVariants)
+            text = text + buildVariantText(
+                variant: variant,
+                isActive: isActive,
+                marker: slotMarker(wordIndex: wordIndex, vIdx: vIdx,
+                                   variantCount: word.hanjaVariants.count))
         }
         return text
     }
@@ -647,7 +659,11 @@ struct ContentView: View {
                         .baselineOffset(-22)
                         .foregroundColor(textColor)
                 }
-                buildVariantText(variant: variant, vIdx: vIdx, isActive: true, hasMultipleVariants: true)
+                buildVariantText(
+                    variant: variant,
+                    isActive: true,
+                    marker: slotMarker(wordIndex: wordIndex, vIdx: vIdx,
+                                       variantCount: word.hanjaVariants.count))
                     .textSelection(.enabled)
                     .lineLimit(1)
                     .fixedSize()
@@ -1023,7 +1039,6 @@ struct ContentView: View {
 
     /// 단어 하나의 훈/음 섹션 (변형 나열)
     private func hunEumWordSection(word: HanjaWord, wordIndex: Int) -> some View {
-        let hasMultipleVariants = word.hanjaVariants.count > 1
         return VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(word.hanjaVariants.enumerated()), id: \.offset) { vIdx, variant in
                 if vIdx > 0 {
@@ -1046,8 +1061,10 @@ struct ContentView: View {
                                         return Text(gradeSymbol(for: char) + " ")
                                             .foregroundColor(gradeColor(for: char))
                                     }()
-                                    if hasMultipleVariants && cIdx == 0 {
-                                        if vIdx == 0 {
+                                    let marker = slotMarker(wordIndex: wordIndex, vIdx: vIdx,
+                                                            variantCount: word.hanjaVariants.count)
+                                    if let marker, cIdx == 0 {
+                                        if marker == 0 {
                                             (gradePrefix
                                             + Text(charInfo.hun)
                                                 .foregroundColor(textColor)
@@ -1059,7 +1076,7 @@ struct ContentView: View {
                                             (gradePrefix
                                             + Text(charInfo.hun)
                                                 .foregroundColor(textColor)
-                                            + Text(" \(vIdx)")
+                                            + Text(" \(marker)")
                                                 .font(.system(size: 9, weight: .medium))
                                                 .foregroundColor(textColor)
                                                 .baselineOffset(6))
