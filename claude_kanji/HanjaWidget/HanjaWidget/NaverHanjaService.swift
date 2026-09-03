@@ -74,8 +74,10 @@ class HanjaService {
             return searchByEum(eum: trimmed, inputText: trimmed)
         }
 
-        // 한자를 그대로 넣으면 그 글자가 든 낱말을 모아 준다
-        if trimmed.contains(where: { $0.isHanja }) {
+        // 한자만 넣으면 그 글자가 든 낱말을 모아 준다. 한글이 섞여 있으면
+        // 여기서 받지 않고 아래의 낱말 찾기로 보낸다 — 한자가 박힌 문장이야말로
+        // 그 길로 읽을 것이고, 한 글자에 걸려 글 전체를 잃으면 안 된다.
+        if !trimmed.isEmpty, trimmed.allSatisfy({ $0.isHanja || $0.isWhitespace }) {
             return searchByHanja(trimmed)
         }
 
